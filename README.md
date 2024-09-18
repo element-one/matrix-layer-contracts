@@ -1,1 +1,3 @@
-# wphone-contracts
+# metabit-metalink-contracts
+* MLinkAiAgent: 0xB76629E11ff2Bdb9C7175Adcbc145d04CeCe36FE
+* MLinkWifi: 0x91Db154551DEe8223B97da895c9C3921dc027c1c
