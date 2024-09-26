@@ -12,8 +12,10 @@ contract Payment {
     bytes32 public whitelistRoot;
 
     enum DeviceType {
-        Wifi,
-        AiAgent
+        Phone,
+        AiAgentOne,
+        AiAgentPro,
+        AiAgentUltra
     }
 
     struct PaymentDetails {

@@ -4,7 +4,7 @@ pragma solidity ^0.8.4;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MLinkAiAgent is ERC721, Ownable {
+contract MLinkAiAgentUltra is ERC721, Ownable {
     uint256 public tokenCounter;
     string private baseTokenURI;
     address public operator;
@@ -12,7 +12,7 @@ contract MLinkAiAgent is ERC721, Ownable {
 
     constructor(
         address initialOwner
-    ) ERC721("MLinkAiAgent", "MLKAI") Ownable(initialOwner) {
+    ) ERC721("MLinkAiAgentUltra", "MLKAI") Ownable(initialOwner) {
         tokenCounter = 0;
     }
 
