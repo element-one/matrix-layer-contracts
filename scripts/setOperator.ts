@@ -1,6 +1,6 @@
 import { ethers, JsonRpcProvider } from 'ethers';
 import 'dotenv/config';
-import { mlinkAiAgentOneABI, mlinkPhoneABI, mlinkAiAgentUltraABI, mlinkAiAgentProABI } from './abi';
+import { matrixAiAgentOneABI, matrixPhoneABI, matrixAiAgentUltraABI, matrixAiAgentProABI } from './abi';
 
 async function setOperator() {
   const privateKey = process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY;
@@ -8,20 +8,20 @@ async function setOperator() {
   const provider = new JsonRpcProvider(rpcURL);
   const ownerWallet = new ethers.Wallet(privateKey!, provider);
   
-  const MLinkPhoneContract = new ethers.Contract(process.env.MLINK_PHONE_ADDRESS!, mlinkPhoneABI, ownerWallet);
-  const MLinkAiAgentOneContract = new ethers.Contract(process.env.MLINK_AI_AGENT_ONE_ADDRESS!, mlinkAiAgentOneABI, ownerWallet);
-  const MLinkAiAgentProContract = new ethers.Contract(process.env.MLINK_AI_AGENT_PRO_ADDRESS!, mlinkAiAgentProABI, ownerWallet);
-  const MLinkAiAgentUltraContract = new ethers.Contract(process.env.MLINK_AI_AGENT_ULTRA_ADDRESS!, mlinkAiAgentUltraABI, ownerWallet);
+  const MatrixPhoneContract = new ethers.Contract(process.env.MATRIX_PHONE_ADDRESS!, matrixPhoneABI, ownerWallet);
+  const MatrixAiAgentOneContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ONE_ADDRESS!, matrixAiAgentOneABI, ownerWallet);
+  const MatrixAiAgentProContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_PRO_ADDRESS!, matrixAiAgentProABI, ownerWallet);
+  const MatrixAiAgentUltraContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ULTRA_ADDRESS!, matrixAiAgentUltraABI, ownerWallet);
   const operatorAddress = process.env.OPERATOR_ADDRESS!;
 
   try {
-    let tx = await MLinkPhoneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
+    let tx = await MatrixPhoneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
     await tx.wait();
-    tx = await MLinkAiAgentOneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
+    tx = await MatrixAiAgentOneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
     await tx.wait();
-    tx = await MLinkAiAgentProContract.setOperator(operatorAddress, { gasLimit: 1000000 });
+    tx = await MatrixAiAgentProContract.setOperator(operatorAddress, { gasLimit: 1000000 });
     await tx.wait();
-    tx = await MLinkAiAgentUltraContract.setOperator(operatorAddress, { gasLimit: 1000000 });
+    tx = await MatrixAiAgentUltraContract.setOperator(operatorAddress, { gasLimit: 1000000 });
     await tx.wait();
     console.log(`Operator set to ${operatorAddress}`);
   } catch (error) {

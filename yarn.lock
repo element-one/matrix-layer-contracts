@@ -3155,7 +3155,7 @@ resolve@^1.1.6:
   dependencies:
     is-core-module "^2.13.0"
     path-parse "^1.0.7"
-    supports-preserve-symlinks-flag "^1.0.0"
+    supports-preserve-symatrixs-flag "^1.0.0"
 
 reusify@^1.0.4:
   version "1.0.4"
@@ -3515,9 +3515,9 @@ supports-color@^8.1.1:
   dependencies:
     has-flag "^4.0.0"
 
-supports-preserve-symlinks-flag@^1.0.0:
+supports-preserve-symatrixs-flag@^1.0.0:
   version "1.0.0"
-  resolved "https://registry.npmjs.org/supports-preserve-symlinks-flag/-/supports-preserve-symlinks-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
+  resolved "https://registry.npmjs.org/supports-preserve-symatrixs-flag/-/supports-preserve-symatrixs-flag-1.0.0.tgz#6eda4bd344a3c94aea376d4cc31bc77311039e09"
   integrity sha512-ot0WnXS9fgdkgIcePe6RHNk1WA8+muPa6cSjeR3V8K27q9BB1rTE3R1p7Hv0z1ZyAc8s6Vvv8DIyWf681MAt0w==
 
 sync-request@^6.0.0:

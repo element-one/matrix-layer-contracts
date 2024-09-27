@@ -1,4 +1,4 @@
-export const mlinkPhoneABI = [
+export const matrixPhoneABI = [
   {
     "inputs": [
       {
@@ -653,7 +653,7 @@ export const mlinkPhoneABI = [
   }
 ]
 
-export const mlinkAiAgentOneABI = [
+export const matrixAiAgentOneABI = [
   {
     "inputs": [
       {
@@ -1308,7 +1308,7 @@ export const mlinkAiAgentOneABI = [
   }
 ];
 
-export const mlinkAiAgentProABI = [
+export const matrixAiAgentProABI = [
   {
     "inputs": [
       {
@@ -1962,7 +1962,7 @@ export const mlinkAiAgentProABI = [
     "type": "function"
   }
 ]
-export const mlinkAiAgentUltraABI = [
+export const matrixAiAgentUltraABI = [
   {
     "inputs": [
       {

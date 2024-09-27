@@ -1,9 +1,9 @@
 {
   "scripts": {
     "deploy:payment": "hardhat run scripts/deployPayment.ts --network bscTestnet",
-    "deploy:mlink": "hardhat run scripts/deployMLink.ts --network bscTestnet",
+    "deploy:matrix": "hardhat run scripts/deployMatrix.ts --network bscTestnet",
     "deploy:payment:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployPayment.ts --network bscMainnet",
-    "deploy:mlink:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployMLink.ts --network bscMainnet",
+    "deploy:matrix:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployMatrix.ts --network bscMainnet",
     "operator": "ts-node scripts/setOperator.ts",
     "operator:mainnet": "cross-env NODE_ENV=production ts-node scripts/setOperator.ts"
   },
