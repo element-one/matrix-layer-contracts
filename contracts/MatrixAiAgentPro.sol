@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
@@ -8,11 +8,11 @@ contract MatrixAiAgentPro is ERC721, Ownable {
     uint256 public tokenCounter;
     string private baseTokenURI;
     address public operator;
-    mapping(address => bool) public whitelistedContracts;
+    mapping(address => bool) public whitelistedAddresses;
 
     constructor(
         address initialOwner
-    ) ERC721("MatrixAiAgentPro", "MLKAI") Ownable(initialOwner) {
+    ) ERC721("Matrix AI Agent Pro", "MAAP") Ownable(initialOwner) {
         tokenCounter = 0;
     }
 
@@ -28,16 +28,12 @@ contract MatrixAiAgentPro is ERC721, Ownable {
         operator = _operator;
     }
 
-    function addWhitelistedContract(
-        address contractAddress
-    ) external onlyOwner {
-        whitelistedContracts[contractAddress] = true;
+    function addWhitelistedAddress(address _address) external onlyOwner {
+        whitelistedAddresses[_address] = true;
     }
 
-    function removeWhitelistedContract(
-        address contractAddress
-    ) external onlyOwner {
-        whitelistedContracts[contractAddress] = false;
+    function removeWhitelistedAddress(address _address) external onlyOwner {
+        whitelistedAddresses[_address] = false;
     }
 
     function mint(address to, uint256 quantity) external onlyOwnerOrOperator {
@@ -73,9 +69,9 @@ contract MatrixAiAgentPro is ERC721, Ownable {
         address auth
     ) internal override(ERC721) returns (address) {
         address from = _ownerOf(tokenId);
-        if (
-            from != address(0) && to != address(0) && !whitelistedContracts[to]
-        ) {
+        if (to != address(0) && !whitelistedAddresses[to]) {
+            revert("This token is soulbound and cannot be transferred");
+        } else if (from != address(0) && !whitelistedAddresses[from]) {
             revert("This token is soulbound and cannot be transferred");
         }
 

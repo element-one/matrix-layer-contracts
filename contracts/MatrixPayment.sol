@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
-contract Payment {
+contract MatrixPayment {
     address public owner;
     IERC20 public usdtToken;
     bool public isPrivateSaleActive;
@@ -13,6 +13,7 @@ contract Payment {
 
     enum DeviceType {
         Phone,
+        AiAgentOrigin,
         AiAgentOne,
         AiAgentPro,
         AiAgentUltra
@@ -21,6 +22,11 @@ contract Payment {
     struct PaymentDetails {
         address from;
         uint256 amount;
+        DeviceType deviceType;
+        uint256 quantity;
+    }
+
+    struct DeviceOrder {
         DeviceType deviceType;
         uint256 quantity;
     }
@@ -69,13 +75,13 @@ contract Payment {
     }
 
     function payPrivateSale(
-        uint256 amount,
-        DeviceType deviceType,
-        uint256 quantity,
+        uint256 totalAmount,
+        DeviceOrder[] calldata orders,
         bytes32[] calldata merkleProof
     ) public {
         require(isPrivateSaleActive, "Private sale is not active");
-        require(amount > 0, "Amount must be greater than zero");
+        require(totalAmount > 0, "Total amount must be greater than zero");
+        require(orders.length > 0, "Must order at least one device");
 
         bytes32 leaf = keccak256(abi.encodePacked(msg.sender));
         require(
@@ -84,27 +90,41 @@ contract Payment {
         );
 
         require(
-            usdtToken.transferFrom(msg.sender, address(this), amount),
+            usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
 
-        emit PaymentReceived(msg.sender, amount, deviceType, quantity);
+        for (uint256 i = 0; i < orders.length; i++) {
+            emit PaymentReceived(
+                msg.sender,
+                0,
+                orders[i].deviceType,
+                orders[i].quantity
+            );
+        }
     }
 
     function payPublicSale(
-        uint256 amount,
-        DeviceType deviceType,
-        uint256 quantity
+        uint256 totalAmount,
+        DeviceOrder[] calldata orders
     ) public {
         require(isPublicSaleActive, "Public sale is not active");
-        require(amount > 0, "Amount must be greater than zero");
+        require(totalAmount > 0, "Total amount must be greater than zero");
+        require(orders.length > 0, "Must order at least one device");
 
         require(
-            usdtToken.transferFrom(msg.sender, address(this), amount),
+            usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
 
-        emit PaymentReceived(msg.sender, amount, deviceType, quantity);
+        for (uint256 i = 0; i < orders.length; i++) {
+            emit PaymentReceived(
+                msg.sender,
+                0,
+                orders[i].deviceType,
+                orders[i].quantity
+            );
+        }
     }
 
     function withdrawUsdt(uint256 amount) public onlyOwner {
