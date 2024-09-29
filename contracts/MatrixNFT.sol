@@ -4,28 +4,30 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MatrixAiAgentUltra is ERC721, Ownable {
+contract MatrixNFT is ERC721, Ownable {
     uint256 public tokenCounter;
     string private baseTokenURI;
-    address public operator;
+    mapping(address => bool) public operators;
     mapping(address => bool) public whitelistedAddresses;
 
     constructor(
+        string memory name,
+        string memory symbol,
         address initialOwner
-    ) ERC721("AI Agent Ultra", "MAAU") Ownable(initialOwner) {
+    ) ERC721(name, symbol) Ownable(initialOwner) {
         tokenCounter = 0;
     }
 
     modifier onlyOwnerOrOperator() {
         require(
-            msg.sender == owner() || msg.sender == operator,
-            "Caller is not the owner or operator"
+            msg.sender == owner() || operators[msg.sender],
+            "Caller is not the owner or an operator"
         );
         _;
     }
 
-    function setOperator(address _operator) external onlyOwner {
-        operator = _operator;
+    function setOperator(address _operator, bool _status) external onlyOwner {
+        operators[_operator] = _status;
     }
 
     function setWhitelistedAddress(

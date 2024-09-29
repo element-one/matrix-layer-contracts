@@ -2,10 +2,14 @@
 pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
+interface IMatrixNFT is IERC721 {
+    function mint(address to, uint256 quantity) external;
+}
 
 contract MatrixPayment is ReentrancyGuard, Ownable {
     IERC20 public usdtToken;
@@ -127,13 +131,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
                 "NFT contract not set for device type"
             );
 
-            for (uint256 j = 0; j < orders[i].quantity; j++) {
-                IERC721(nftContract).safeTransferFrom(
-                    address(this),
-                    msg.sender,
-                    j
-                );
-            }
+            IMatrixNFT(nftContract).mint(msg.sender, orders[i].quantity);
         }
 
         PaymentData memory paymentData = PaymentData({
@@ -165,13 +163,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
                 "NFT contract not set for device type"
             );
 
-            for (uint256 j = 0; j < orders[i].quantity; j++) {
-                IERC721(nftContract).safeTransferFrom(
-                    address(this),
-                    msg.sender,
-                    j
-                );
-            }
+            IMatrixNFT(nftContract).mint(msg.sender, orders[i].quantity);
         }
 
         PaymentData memory paymentData = PaymentData({
