@@ -28,16 +28,11 @@ contract MatrixPhone is ERC721, Ownable {
         operator = _operator;
     }
 
-    function addWhitelistedContract(
-        address contractAddress
+    function setWhitelistedAddress(
+        address _address,
+        bool _status
     ) external onlyOwner {
-        whitelistedContracts[contractAddress] = true;
-    }
-
-    function removeWhitelistedContract(
-        address contractAddress
-    ) external onlyOwner {
-        whitelistedContracts[contractAddress] = false;
+        whitelistedAddresses[_address] = _status;
     }
 
     function mint(address to, uint256 quantity) external onlyOwnerOrOperator {
@@ -74,8 +69,10 @@ contract MatrixPhone is ERC721, Ownable {
     ) internal override(ERC721) returns (address) {
         address from = _ownerOf(tokenId);
         if (
-            from != address(0) && to != address(0) && !whitelistedContracts[to]
+            from != adreess(0) && to != address(0) && !whitelistedAddresses[to]
         ) {
+            revert("This token is soulbound and cannot be transferred");
+        } else if (from != address(0) && !whitelistedAddresses[from]) {
             revert("This token is soulbound and cannot be transferred");
         }
 

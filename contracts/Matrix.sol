@@ -28,12 +28,11 @@ contract Matrix is ERC721, Ownable {
         operator = _operator;
     }
 
-    function addWhitelistedAddress(address _address) external onlyOwner {
-        whitelistedAddresses[_address] = true;
-    }
-
-    function removeWhitelistedAddress(address _address) external onlyOwner {
-        whitelistedAddresses[_address] = false;
+    function setWhitelistedAddress(
+        address _address,
+        bool _status
+    ) external onlyOwner {
+        whitelistedAddresses[_address] = _status;
     }
 
     function mint(address to, uint256 quantity) external onlyOwnerOrOperator {
@@ -69,7 +68,9 @@ contract Matrix is ERC721, Ownable {
         address auth
     ) internal override(ERC721) returns (address) {
         address from = _ownerOf(tokenId);
-        if (to != address(0) && !whitelistedAddresses[to]) {
+        if (
+            from != address(0) && to != address(0) && !whitelistedAddresses[to]
+        ) {
             revert("This token is soulbound and cannot be transferred");
         } else if (from != address(0) && !whitelistedAddresses[from]) {
             revert("This token is soulbound and cannot be transferred");
