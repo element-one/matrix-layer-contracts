@@ -8,7 +8,7 @@ contract MatrixPhone is ERC721, Ownable {
     uint256 public tokenCounter;
     string private baseTokenURI;
     address public operator;
-    mapping(address => bool) public whitelistedContracts;
+    mapping(address => bool) public whitelistedAddresses;
 
     constructor(
         address initialOwner
@@ -69,7 +69,7 @@ contract MatrixPhone is ERC721, Ownable {
     ) internal override(ERC721) returns (address) {
         address from = _ownerOf(tokenId);
         if (
-            from != adreess(0) && to != address(0) && !whitelistedAddresses[to]
+            from != address(0) && to != address(0) && !whitelistedAddresses[to]
         ) {
             revert("This token is soulbound and cannot be transferred");
         } else if (from != address(0) && !whitelistedAddresses[from]) {
