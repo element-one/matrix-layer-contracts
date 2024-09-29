@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -10,15 +11,22 @@ import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
-    IERC20 public wlpToken;
-    IERC721 public nftContract;
+    IERC20 public token;
 
     enum NFTType {
+        Phone,
+        Matrix,
         AiAgentOne,
         AiAgentPro,
-        AiAgentUltra,
-        AiAgentOrigin
+        AiAgentUltra
     }
+    enum RewardType {
+        Basic,
+        Accelerate,
+        Ecosystem
+    }
+
+    mapping(NFTType => IERC721) public nftContracts;
 
     struct Stake {
         uint256 amount;
@@ -26,120 +34,229 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
     }
 
     struct NFTStake {
-        NFTType nftType;
-        uint256 tokenId;
-        uint256 timestamp;
+        uint256 stakeTimestamp;
+        uint256 firstStakeTimestamp;
     }
 
-    mapping(address => Stake) public wlpStakes;
-    mapping(address => NFTStake[]) public nftStakes;
-    mapping(NFTType => uint256) public nftRewardRates;
-    uint256 public wlpRewardRate;
+    mapping(address => Stake) public tokenStakes;
+    mapping(address => mapping(NFTType => mapping(uint256 => NFTStake)))
+        public nftStakes; // user => NFTType => tokenId => NFTStake
+    mapping(NFTType => uint256) public totalStakedNFTs; // Total staked NFTs for each type
+    mapping(address => uint256) public userTotalStakedNFTs; // Total staked NFTs for each user
+
+    mapping(RewardType => uint256) public rewardPools;
 
     address public rewardSigner;
-    mapping(address => uint256) public nonces;
+    mapping(address => mapping(RewardType => uint256)) public nonces;
+
+    uint256 public constant PHONE_STAKE_LOCK_PERIOD = 30 days;
 
     bytes32 private constant CLAIM_TYPEHASH =
-        keccak256("Claim(address user,uint256 amount,uint256 nonce)");
+        keccak256(
+            "Claim(address user,uint256 amount,uint256 nonce,RewardType rewardType)"
+        );
 
-    event WLPStaked(address indexed user, uint256 amount);
-    event WLPUnstaked(address indexed user, uint256 amount);
-    event NFTStaked(address indexed user, NFTType nftType, uint256 tokenId);
-    event NFTUnstaked(address indexed user, NFTType nftType, uint256 tokenId);
-    event RewardClaimed(address indexed user, uint256 amount);
+    event TokenStaked(address indexed user, uint256 amount, uint256 timestamp);
+    event TokenUnstaked(
+        address indexed user,
+        uint256 amount,
+        uint256 timestamp
+    );
+    event NFTStaked(
+        address indexed user,
+        NFTType nftType,
+        uint256 tokenId,
+        uint256 timestamp,
+        uint256 firstStakeTimestamp
+    );
+    event NFTUnstaked(
+        address indexed user,
+        NFTType nftType,
+        uint256 tokenId,
+        uint256 timestamp
+    );
+    event RewardClaimed(
+        address indexed user,
+        uint256 amount,
+        RewardType rewardType,
+        uint256 timestamp
+    );
+    event NFTContractSet(NFTType nftType, address contractAddress);
+    event RewardPoolFunded(
+        RewardType rewardType,
+        uint256 amount,
+        uint256 timestamp
+    );
 
     constructor(
-        address _wlpToken,
-        address _nftContract,
-        address _rewardSigner
+        address _token,
+        address _rewardSigner,
+        address[5] memory _nftContracts
     ) Ownable(msg.sender) EIP712("MatrixStaking", "1") {
-        wlpToken = IERC20(_wlpToken);
-        nftContract = IERC721(_nftContract);
+        token = IERC20(_token);
+        rewardSigner = _rewardSigner;
+
+        for (uint i = 0; i < 5; i++) {
+            nftContracts[NFTType(i)] = IERC721(_nftContracts[i]);
+            emit NFTContractSet(NFTType(i), _nftContracts[i]);
+        }
+    }
+
+    function setRewardSigner(address _rewardSigner) external onlyOwner {
         rewardSigner = _rewardSigner;
     }
 
-    function setRewardRates(
-        uint256 _wlpRate,
-        uint256[4] memory _nftRates
+    function fundRewardPool(
+        RewardType rewardType,
+        uint256 amount
     ) external onlyOwner {
-        wlpRewardRate = _wlpRate;
-        nftRewardRates[NFTType.AiAgentOne] = _nftRates[0];
-        nftRewardRates[NFTType.AiAgentPro] = _nftRates[1];
-        nftRewardRates[NFTType.AiAgentUltra] = _nftRates[2];
-        nftRewardRates[NFTType.AiAgentOrigin] = _nftRates[3];
+        require(
+            token.transferFrom(msg.sender, address(this), amount),
+            "Transfer failed"
+        );
+        rewardPools[rewardType] += amount;
+        emit RewardPoolFunded(rewardType, amount, block.timestamp);
     }
 
-    function stakeWLP(uint256 amount) external nonReentrant {
+    function stakeToken(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(
-            wlpToken.transferFrom(msg.sender, address(this), amount),
+            token.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
         );
 
-        wlpStakes[msg.sender].amount += amount;
-        wlpStakes[msg.sender].timestamp = block.timestamp;
+        uint256 timestamp = block.timestamp;
+        tokenStakes[msg.sender].amount += amount;
+        tokenStakes[msg.sender].timestamp = timestamp;
 
-        emit WLPStaked(msg.sender, amount);
+        emit TokenStaked(msg.sender, amount, timestamp);
     }
 
-    function unstakeWLP(uint256 amount) external nonReentrant {
+    function unstakeToken(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
         require(
-            wlpStakes[msg.sender].amount >= amount,
+            tokenStakes[msg.sender].amount >= amount,
             "Insufficient staked amount"
         );
 
-        wlpStakes[msg.sender].amount -= amount;
-        require(wlpToken.transfer(msg.sender, amount), "Transfer failed");
+        tokenStakes[msg.sender].amount -= amount;
+        require(token.transfer(msg.sender, amount), "Transfer failed");
 
-        emit WLPUnstaked(msg.sender, amount);
+        uint256 timestamp = block.timestamp;
+        emit TokenUnstaked(msg.sender, amount, timestamp);
     }
 
     function stakeNFT(NFTType nftType, uint256 tokenId) external nonReentrant {
+        IERC721 nftContract = nftContracts[nftType];
+        require(address(nftContract) != address(0), "NFT type not supported");
         require(
             nftContract.ownerOf(tokenId) == msg.sender,
             "Not the owner of the NFT"
         );
+        require(
+            nftStakes[msg.sender][nftType][tokenId].stakeTimestamp == 0,
+            "NFT already staked"
+        );
+
+        uint256 timestamp = block.timestamp;
+
+        if (nftType == NFTType.Phone) {
+            require(
+                nftStakes[msg.sender][nftType][tokenId].firstStakeTimestamp ==
+                    0 ||
+                    timestamp <=
+                    nftStakes[msg.sender][nftType][tokenId]
+                        .firstStakeTimestamp +
+                        PHONE_STAKE_LOCK_PERIOD,
+                "Phone NFT can't be restaked after 30 days from first stake"
+            );
+
+            if (
+                nftStakes[msg.sender][nftType][tokenId].firstStakeTimestamp == 0
+            ) {
+                nftStakes[msg.sender][nftType][tokenId]
+                    .firstStakeTimestamp = timestamp;
+            }
+        }
+
         nftContract.transferFrom(msg.sender, address(this), tokenId);
+        nftStakes[msg.sender][nftType][tokenId].stakeTimestamp = timestamp;
 
-        nftStakes[msg.sender].push(NFTStake(nftType, tokenId, block.timestamp));
+        totalStakedNFTs[nftType]++;
+        userTotalStakedNFTs[msg.sender]++;
 
-        emit NFTStaked(msg.sender, nftType, tokenId);
+        emit NFTStaked(
+            msg.sender,
+            nftType,
+            tokenId,
+            timestamp,
+            nftStakes[msg.sender][nftType][tokenId].firstStakeTimestamp
+        );
     }
 
-    function unstakeNFT(uint256 index) external nonReentrant {
-        require(index < nftStakes[msg.sender].length, "Invalid index");
+    function unstakeNFT(
+        NFTType nftType,
+        uint256 tokenId
+    ) external nonReentrant {
+        IERC721 nftContract = nftContracts[nftType];
+        require(address(nftContract) != address(0), "NFT type not supported");
+        require(
+            nftStakes[msg.sender][nftType][tokenId].stakeTimestamp != 0,
+            "NFT not staked"
+        );
 
-        NFTStake memory stake = nftStakes[msg.sender][index];
-        nftContract.transferFrom(address(this), msg.sender, stake.tokenId);
+        uint256 timestamp = block.timestamp;
+        uint256 firstStakeTimestamp = nftStakes[msg.sender][nftType][tokenId]
+            .firstStakeTimestamp;
 
-        // Remove the NFT stake from the array
-        nftStakes[msg.sender][index] = nftStakes[msg.sender][
-            nftStakes[msg.sender].length - 1
-        ];
-        nftStakes[msg.sender].pop();
+        delete nftStakes[msg.sender][nftType][tokenId].stakeTimestamp;
+        nftContract.transferFrom(address(this), msg.sender, tokenId);
 
-        emit NFTUnstaked(msg.sender, stake.nftType, stake.tokenId);
+        totalStakedNFTs[nftType]--;
+        userTotalStakedNFTs[msg.sender]--;
+
+        emit NFTUnstaked(msg.sender, nftType, tokenId, timestamp);
     }
 
-    function claimRewards(
+    function claimReward(
         uint256 amount,
+        RewardType rewardType,
         bytes memory signature
     ) external nonReentrant {
         bytes32 structHash = keccak256(
-            abi.encode(CLAIM_TYPEHASH, msg.sender, amount, nonces[msg.sender])
+            abi.encode(
+                CLAIM_TYPEHASH,
+                msg.sender,
+                amount,
+                nonces[msg.sender][rewardType],
+                rewardType
+            )
         );
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = hash.recover(signature);
         require(signer == rewardSigner, "Invalid signature");
 
-        nonces[msg.sender]++;
+        nonces[msg.sender][rewardType]++;
 
         require(
-            wlpToken.transfer(msg.sender, amount),
-            "Reward transfer failed"
+            rewardPools[rewardType] >= amount,
+            "Insufficient reward pool balance"
         );
+        rewardPools[rewardType] -= amount;
+        require(token.transfer(msg.sender, amount), "Reward transfer failed");
 
-        emit RewardClaimed(msg.sender, amount);
+        emit RewardClaimed(msg.sender, amount, rewardType, block.timestamp);
+    }
+
+    function getTotalStakedNFTs() public view returns (uint256[5] memory) {
+        uint256[5] memory result;
+        for (uint i = 0; i < 5; i++) {
+            result[i] = totalStakedNFTs[NFTType(i)];
+        }
+        return result;
+    }
+
+    function getUserStakedNFTs(address user) public view returns (uint256) {
+        return userTotalStakedNFTs[user];
     }
 }

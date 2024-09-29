@@ -4,7 +4,7 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MatrixAiAgentOrigin is ERC721, Ownable {
+contract MatrixAiAgentPro is ERC721, Ownable {
     uint256 public tokenCounter;
     string private baseTokenURI;
     address public operator;
@@ -12,7 +12,7 @@ contract MatrixAiAgentOrigin is ERC721, Ownable {
 
     constructor(
         address initialOwner
-    ) ERC721("Matrix AI Agent Origin", "MAAOG") Ownable(initialOwner) {
+    ) ERC721("AI Agent Pro", "AAP") Ownable(initialOwner) {
         tokenCounter = 0;
     }
 

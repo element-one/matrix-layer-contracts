@@ -12,7 +12,7 @@ contract MatrixPhone is ERC721, Ownable {
 
     constructor(
         address initialOwner
-    ) ERC721("MatrixPhone", "MLKAI") Ownable(initialOwner) {
+    ) ERC721("Matrix Phone", "MLKAI") Ownable(initialOwner) {
         tokenCounter = 0;
     }
 
