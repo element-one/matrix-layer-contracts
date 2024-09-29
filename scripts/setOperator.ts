@@ -8,6 +8,7 @@ async function setOperator() {
   const provider = new JsonRpcProvider(rpcURL);
   const ownerWallet = new ethers.Wallet(privateKey!, provider);
   
+  const MatrixContract = new ethers.Contract(process.env.MATRIX_ADDRESS!, matrixPhoneABI, ownerWallet);
   const MatrixPhoneContract = new ethers.Contract(process.env.MATRIX_PHONE_ADDRESS!, matrixPhoneABI, ownerWallet);
   const MatrixAiAgentOneContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ONE_ADDRESS!, matrixAiAgentOneABI, ownerWallet);
   const MatrixAiAgentProContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_PRO_ADDRESS!, matrixAiAgentProABI, ownerWallet);
@@ -15,7 +16,9 @@ async function setOperator() {
   const operatorAddress = process.env.OPERATOR_ADDRESS!;
 
   try {
-    let tx = await MatrixPhoneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
+    let tx = await MatrixContract.setOperator(operatorAddress, { gasLimit: 1000000 });
+    await tx.wait();
+    tx = await MatrixPhoneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
     await tx.wait();
     tx = await MatrixAiAgentOneContract.setOperator(operatorAddress, { gasLimit: 1000000 });
     await tx.wait();

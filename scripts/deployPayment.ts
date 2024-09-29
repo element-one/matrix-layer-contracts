@@ -3,7 +3,14 @@ import { deployContract } from './utils'
 
 async function main() {
   await deployContract('MockUSDT')
-  return deployContract('Payment', readFileSync('cache/MockUSDT', 'utf-8'))
+  const tokenAddress = readFileSync('cache/MockUSDT', 'utf-8')
+  const MatrixAddress = readFileSync('cache/Matrix', 'utf-8')
+  const MatrixAiAgentOneAddress = readFileSync('cache/MatrixAiAgentOne', 'utf-8')
+  const MatrixAiAgentProAddress = readFileSync('cache/MatrixAiAgentPro', 'utf-8')
+  const MatrixAiAgentUltraAddress = readFileSync('cache/MatrixAiAgentUltra', 'utf-8')
+  const MatrixPhoneAddress = readFileSync('cache/MatrixPhone', 'utf-8')
+  await deployContract('MatrixStaking', [tokenAddress, 'TODO', [MatrixAddress, MatrixAiAgentOneAddress, MatrixAiAgentProAddress, MatrixAiAgentUltraAddress, MatrixPhoneAddress]])
+  await deployContract('MatrixPayment', [tokenAddress])
 }
 
 main().catch((error) => {

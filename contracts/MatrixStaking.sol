@@ -3,7 +3,7 @@ pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
@@ -206,8 +206,8 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
         );
 
         uint256 timestamp = block.timestamp;
-        uint256 firstStakeTimestamp = nftStakes[msg.sender][nftType][tokenId]
-            .firstStakeTimestamp;
+        // uint256 firstStakeTimestamp = nftStakes[msg.sender][nftType][tokenId]
+        //     .firstStakeTimestamp;
 
         delete nftStakes[msg.sender][nftType][tokenId].stakeTimestamp;
         nftContract.transferFrom(address(this), msg.sender, tokenId);
