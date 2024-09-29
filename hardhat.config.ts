@@ -5,7 +5,7 @@ import '@nomicfoundation/hardhat-toolbox'
 const privateKey = process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.20',
+  solidity: '0.8.23',
   networks: {
     bscTestnet: {
       url: process.env.TESTNET_BSC_PROJECT_URL,

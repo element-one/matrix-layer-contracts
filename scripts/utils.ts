@@ -7,7 +7,7 @@ async function verifyContract(
   deployedAddress: string,
   contractPath: string,
   contractName: string,
-  constructorArguments: string[]
+  constructorArguments: any[]
 ) {
   try {
     await run('verify:verify', {
@@ -23,7 +23,7 @@ async function verifyContract(
   }
 }
 
-export async function deployContract(contractName: string, tokenAddress?: string, disableVerify?: boolean) {
+export async function deployContract(contractName: string, params?: any[], disableVerify?: boolean) {
   const [deployer] = await ethers.getSigners()
   console.log(`Deploying ${contractName} contract with the account:`, deployer.address)
 
@@ -31,11 +31,14 @@ export async function deployContract(contractName: string, tokenAddress?: string
 
   let contract
   let constructorArguments: string[] = []
-  if (tokenAddress) {
-    contract = await Contract.deploy(tokenAddress, { gasLimit: 3000000 })
-    constructorArguments = [tokenAddress]
+  if (params?.length === 1) {
+    contract = await Contract.deploy(params[0], { gasLimit: 3000000 })
+    constructorArguments = params
   } else if (contractName === 'MockUSDT') {
     contract = await Contract.deploy({ gasLimit: 3000000 })
+  } else if (params?.length === 3) {
+    contract = await Contract.deploy(params[0], params[1], params[2], { gasLimit: 3000000 })
+    constructorArguments = params
   } else {
     contract = await Contract.deploy(deployer.address, { gasLimit: 3000000 })
     constructorArguments = [deployer.address]
