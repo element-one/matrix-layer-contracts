@@ -2,9 +2,10 @@
 pragma solidity ^0.8.23;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 contract MatrixPayment is ReentrancyGuard, Ownable {
     IERC20 public usdtToken;
@@ -32,15 +33,30 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
         uint256 totalAmount;
     }
 
+    mapping(DeviceType => address) public nftContracts;
+
     event PaymentReceived(PaymentData paymentData);
     event UsdtTokenAddressSet(address tokenAddress);
     event PrivateSaleStateChanged(bool isActive);
     event PublicSaleStateChanged(bool isActive);
     event WhitelistRootUpdated(bytes32 newRoot);
+    event NftContractAddressSet(DeviceType deviceType, address contractAddress);
 
-    constructor(address tokenAddress) Ownable(msg.sender) {
+    constructor(
+        address tokenAddress,
+        address[] memory nftAddresses
+    ) Ownable(msg.sender) {
+        require(
+            nftAddresses.length == 5,
+            "Must provide 5 NFT contract addresses"
+        );
         usdtToken = IERC20(tokenAddress);
         emit UsdtTokenAddressSet(tokenAddress);
+
+        for (uint256 i = 0; i < nftAddresses.length; i++) {
+            nftContracts[DeviceType(i)] = nftAddresses[i];
+            emit NftContractAddressSet(DeviceType(i), nftAddresses[i]);
+        }
     }
 
     function setUsdtTokenAddress(address tokenAddress) external onlyOwner {
@@ -61,6 +77,25 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
     function setWhitelistRoot(bytes32 _whitelistRoot) external onlyOwner {
         whitelistRoot = _whitelistRoot;
         emit WhitelistRootUpdated(_whitelistRoot);
+    }
+
+    function setNftContractAddresses(
+        address[] calldata nftAddresses
+    ) external onlyOwner {
+        require(
+            nftAddresses.length == 5,
+            "Must provide 5 NFT contract addresses"
+        );
+        for (uint256 i = 0; i < nftAddresses.length; i++) {
+            nftContracts[DeviceType(i)] = nftAddresses[i];
+            emit NftContractAddressSet(DeviceType(i), nftAddresses[i]);
+        }
+    }
+
+    function getNftContractAddress(
+        DeviceType deviceType
+    ) external view returns (address) {
+        return nftContracts[deviceType];
     }
 
     function payPrivateSale(
@@ -85,6 +120,22 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
             "Token transfer failed"
         );
 
+        for (uint256 i = 0; i < orders.length; i++) {
+            address nftContract = nftContracts[orders[i].deviceType];
+            require(
+                nftContract != address(0),
+                "NFT contract not set for device type"
+            );
+
+            for (uint256 j = 0; j < orders[i].quantity; j++) {
+                IERC721(nftContract).safeTransferFrom(
+                    address(this),
+                    msg.sender,
+                    j
+                );
+            }
+        }
+
         PaymentData memory paymentData = PaymentData({
             buyer: msg.sender,
             orders: orders,
@@ -106,6 +157,22 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
             usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
+
+        for (uint256 i = 0; i < orders.length; i++) {
+            address nftContract = nftContracts[orders[i].deviceType];
+            require(
+                nftContract != address(0),
+                "NFT contract not set for device type"
+            );
+
+            for (uint256 j = 0; j < orders[i].quantity; j++) {
+                IERC721(nftContract).safeTransferFrom(
+                    address(this),
+                    msg.sender,
+                    j
+                );
+            }
+        }
 
         PaymentData memory paymentData = PaymentData({
             buyer: msg.sender,
