@@ -24,14 +24,13 @@ async function verifyContract(
 }
 
 export async function deployContract(contractName: string, params: any[] = [], fileName = '') {
-  console.log(params)
   const [deployer] = await ethers.getSigners()
   console.log(`Deploying ${contractName} contract with the account:`, deployer.address)
 
   const Contract = await ethers.getContractFactory(contractName)
 
   let constructorArguments: any[] = []
-  const contract = await Contract.deploy(...params, { gasLimit: 3000000 })
+  const contract = await Contract.deploy(...params, { gasLimit: 5000000 })
   constructorArguments = params
 
   await contract.waitForDeployment()
