@@ -1,9 +1,9 @@
 {
   "scripts": {
     "deploy:payment": "hardhat run scripts/deployPayment.ts --network bscTestnet",
-    "deploy:nfts": "hardhat run scripts/deployNFTs.ts --network bscTestnet",
+    "deploy:nft": "hardhat run scripts/deployNFT.ts --network bscTestnet",
     "deploy:payment:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployPayment.ts --network bscMainnet",
-    "deploy:nfts:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployNFTs.ts --network bscMainnet",
+    "deploy:nfts:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployNFT.ts --network bscMainnet",
     "operator": "ts-node scripts/setOperator.ts",
     "operator:mainnet": "cross-env NODE_ENV=production ts-node scripts/setOperator.ts"
   },

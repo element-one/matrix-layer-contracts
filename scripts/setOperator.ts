@@ -1,6 +1,6 @@
 import { ethers, JsonRpcProvider } from 'ethers';
 import 'dotenv/config';
-import { matrixAiAgentOneABI, matrixPhoneABI, matrixAiAgentUltraABI, matrixAiAgentProABI } from './abi';
+import abi from './abi';
 
 async function setOperator() {
   const privateKey = process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY;
@@ -8,11 +8,11 @@ async function setOperator() {
   const provider = new JsonRpcProvider(rpcURL);
   const ownerWallet = new ethers.Wallet(privateKey!, provider);
   
-  const MatrixContract = new ethers.Contract(process.env.MATRIX_ADDRESS!, matrixPhoneABI, ownerWallet);
-  const MatrixPhoneContract = new ethers.Contract(process.env.MATRIX_PHONE_ADDRESS!, matrixPhoneABI, ownerWallet);
-  const MatrixAiAgentOneContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ONE_ADDRESS!, matrixAiAgentOneABI, ownerWallet);
-  const MatrixAiAgentProContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_PRO_ADDRESS!, matrixAiAgentProABI, ownerWallet);
-  const MatrixAiAgentUltraContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ULTRA_ADDRESS!, matrixAiAgentUltraABI, ownerWallet);
+  const MatrixContract = new ethers.Contract(process.env.MATRIX_ADDRESS!, abi, ownerWallet);
+  const MatrixPhoneContract = new ethers.Contract(process.env.MATRIX_PHONE_ADDRESS!, abi, ownerWallet);
+  const MatrixAiAgentOneContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ONE_ADDRESS!, abi, ownerWallet);
+  const MatrixAiAgentProContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_PRO_ADDRESS!, abi, ownerWallet);
+  const MatrixAiAgentUltraContract = new ethers.Contract(process.env.MATRIX_AI_AGENT_ULTRA_ADDRESS!, abi, ownerWallet);
   const operatorAddress = process.env.OPERATOR_ADDRESS!;
 
   try {
