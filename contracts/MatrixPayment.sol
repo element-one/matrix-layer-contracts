@@ -4,19 +4,26 @@ pragma solidity ^0.8.23;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
 interface IMatrixNFT is IERC721 {
     function mint(address to, uint256 quantity) external;
 }
 
-contract MatrixPayment is ReentrancyGuard, Ownable {
+contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
+    using ECDSA for bytes32;
+
     IERC20 public usdtToken;
     bool public isPrivateSaleActive;
     bool public isPublicSaleActive;
 
-    bytes32 public whitelistRoot;
+    address public signerAddress;
+    address public accountingAddress;
+
+    bytes32 private constant SALE_TYPEHASH =
+        keccak256("Sale(address buyer,uint256 totalAmount,address referral)");
 
     enum DeviceType {
         Phone,
@@ -38,29 +45,40 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
     }
 
     mapping(DeviceType => address) public nftContracts;
+    mapping(address => uint256) public referralRewards;
 
     event PaymentReceived(PaymentData paymentData);
     event UsdtTokenAddressSet(address tokenAddress);
     event PrivateSaleStateChanged(bool isActive);
     event PublicSaleStateChanged(bool isActive);
-    event WhitelistRootUpdated(bytes32 newRoot);
+    event SignerAddressUpdated(address newSigner);
     event NftContractAddressSet(DeviceType deviceType, address contractAddress);
+    event AccountingAddressUpdated(address newAccountingAddress);
+    event ReferralRewardClaimed(address indexed referral, uint256 amount);
 
     constructor(
-        address tokenAddress,
-        address[] memory nftAddresses
-    ) Ownable(msg.sender) {
+        address _usdtToken,
+        address[] memory _nftContracts,
+        address _signerAddress,
+        address _accountingAddress
+    ) EIP712("MatrixPayment", "1") Ownable(msg.sender) {
         require(
-            nftAddresses.length == 5,
+            _nftContracts.length == 5,
             "Must provide 5 NFT contract addresses"
         );
-        usdtToken = IERC20(tokenAddress);
-        emit UsdtTokenAddressSet(tokenAddress);
+        usdtToken = IERC20(_usdtToken);
+        emit UsdtTokenAddressSet(_usdtToken);
 
-        for (uint256 i = 0; i < nftAddresses.length; i++) {
-            nftContracts[DeviceType(i)] = nftAddresses[i];
-            emit NftContractAddressSet(DeviceType(i), nftAddresses[i]);
+        for (uint256 i = 0; i < _nftContracts.length; i++) {
+            nftContracts[DeviceType(i)] = _nftContracts[i];
+            emit NftContractAddressSet(DeviceType(i), _nftContracts[i]);
         }
+
+        signerAddress = _signerAddress;
+        emit SignerAddressUpdated(_signerAddress);
+
+        accountingAddress = _accountingAddress;
+        emit AccountingAddressUpdated(_accountingAddress);
     }
 
     function setUsdtTokenAddress(address tokenAddress) external onlyOwner {
@@ -78,9 +96,16 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
         emit PublicSaleStateChanged(_isActive);
     }
 
-    function setWhitelistRoot(bytes32 _whitelistRoot) external onlyOwner {
-        whitelistRoot = _whitelistRoot;
-        emit WhitelistRootUpdated(_whitelistRoot);
+    function setSignerAddress(address _signerAddress) external onlyOwner {
+        signerAddress = _signerAddress;
+        emit SignerAddressUpdated(_signerAddress);
+    }
+
+    function setAccountingAddress(
+        address _accountingAddress
+    ) external onlyOwner {
+        accountingAddress = _accountingAddress;
+        emit AccountingAddressUpdated(_accountingAddress);
     }
 
     function setNftContractAddresses(
@@ -102,27 +127,52 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
         return nftContracts[deviceType];
     }
 
+    function verifySignature(
+        address buyer,
+        uint256 totalAmount,
+        address referral,
+        bytes memory signature
+    ) internal view {
+        bytes32 structHash = keccak256(
+            abi.encode(SALE_TYPEHASH, buyer, totalAmount, referral)
+        );
+        bytes32 hash = _hashTypedDataV4(structHash);
+        address signer = hash.recover(signature);
+        require(signer == signerAddress, "Invalid signature");
+    }
+
+    function processPayment(uint256 totalAmount, address referral) internal {
+        uint256 amountToAccounting = totalAmount;
+        if (referral != address(0)) {
+            amountToAccounting = (totalAmount * 90) / 100;
+            uint256 amountToReferral = totalAmount - amountToAccounting;
+            referralRewards[referral] += amountToReferral;
+        }
+
+        require(
+            usdtToken.transfer(accountingAddress, amountToAccounting),
+            "Token transfer to accounting address failed"
+        );
+    }
+
     function payPrivateSale(
         uint256 totalAmount,
         DeviceOrder[] calldata orders,
-        bytes32[] calldata proof
+        address referral,
+        bytes memory signature
     ) public nonReentrant {
         require(isPrivateSaleActive, "Private sale is not active");
         require(totalAmount > 0, "Total amount must be greater than zero");
         require(orders.length > 0, "Must order at least one device");
-        require(
-            MerkleProof.verify(
-                proof,
-                whitelistRoot,
-                keccak256(abi.encodePacked(msg.sender))
-            ),
-            "Invalid whitelist proof"
-        );
+
+        verifySignature(msg.sender, totalAmount, referral, signature);
 
         require(
             usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
+
+        processPayment(totalAmount, referral);
 
         for (uint256 i = 0; i < orders.length; i++) {
             address nftContract = nftContracts[orders[i].deviceType];
@@ -145,16 +195,22 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
 
     function payPublicSale(
         uint256 totalAmount,
-        DeviceOrder[] calldata orders
+        DeviceOrder[] calldata orders,
+        address referral,
+        bytes memory signature
     ) public nonReentrant {
         require(isPublicSaleActive, "Public sale is not active");
         require(totalAmount > 0, "Total amount must be greater than zero");
         require(orders.length > 0, "Must order at least one device");
 
+        verifySignature(msg.sender, totalAmount, referral, signature);
+
         require(
             usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
+
+        processPayment(totalAmount, referral);
 
         for (uint256 i = 0; i < orders.length; i++) {
             address nftContract = nftContracts[orders[i].deviceType];
@@ -173,6 +229,19 @@ contract MatrixPayment is ReentrancyGuard, Ownable {
         });
 
         emit PaymentReceived(paymentData);
+    }
+
+    function claimReferralReward() external nonReentrant {
+        uint256 reward = referralRewards[msg.sender];
+        require(reward > 0, "No rewards to claim");
+
+        referralRewards[msg.sender] = 0;
+        require(
+            usdtToken.transfer(msg.sender, reward),
+            "Token transfer failed"
+        );
+
+        emit ReferralRewardClaimed(msg.sender, reward);
     }
 
     function withdrawUsdt(uint256 amount) public onlyOwner {
