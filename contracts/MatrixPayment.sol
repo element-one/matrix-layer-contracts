@@ -54,7 +54,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     event SignerAddressUpdated(address newSigner);
     event NftContractAddressSet(DeviceType deviceType, address contractAddress);
     event AccountingAddressUpdated(address newAccountingAddress);
-    event ReferralRewardClaimed(address indexed referral, uint256 amount);
+    event ReferralRewardAdded(address referral, uint256 amount);
+    event ReferralRewardClaimed(address referral, uint256 amount);
 
     constructor(
         address _usdtToken,
@@ -147,6 +148,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             amountToAccounting = (totalAmount * 90) / 100;
             uint256 amountToReferral = totalAmount - amountToAccounting;
             referralRewards[referral] += amountToReferral;
+
+            emit ReferralRewardAdded(referral, amountToReferral);
         }
 
         require(
