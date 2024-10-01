@@ -14,7 +14,7 @@ const domain = {
   name: 'MatrixPayment',
   version: '1',
   chainId: 97,
-  verifyingContract: '0x2E3bE631883802FeD0D36690a74a4a234122a830',
+  verifyingContract: '0xf26C9342d58f98B449Ef932D0f51dC7eBF353060',
 };
 
 // EIP712 types
@@ -29,7 +29,7 @@ const types = {
 // The data to sign
 const value = {
   buyer: '0xe273f8beEb0ca112292c4aC407c35EE604E54cD2',
-  totalAmount: '600000000',
+  totalAmount: '199000000',
   referral: '0xe273f8beEb0ca112292c4aC407c35EE604E54cD2',
 };
 

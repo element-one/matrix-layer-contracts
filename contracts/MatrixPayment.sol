@@ -23,11 +23,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     address public accountingAddress;
 
     bytes32 private constant SALE_TYPEHASH =
-        keccak256(
-            "Sale(address buyer,uint256 totalAmount,address referral,DeviceOrder[] orders)"
-        );
-    bytes32 private constant DEVICE_ORDER_TYPEHASH =
-        keccak256("DeviceOrder(uint8 deviceType,uint256 quantity)");
+        keccak256("Sale(address buyer,uint256 totalAmount,address referral)");
 
     enum DeviceType {
         Phone,
