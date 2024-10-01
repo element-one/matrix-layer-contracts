@@ -288,6 +288,12 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         emit ReferralRewardClaimed(msg.sender, reward);
     }
 
+    function getReferralRewards(
+        address referrer
+    ) public view returns (uint256) {
+        return referralRewards[referrer];
+    }
+
     function withdrawUsdt(uint256 amount) public onlyOwner {
         require(usdtToken.transfer(owner(), amount), "Token withdrawal failed");
     }
