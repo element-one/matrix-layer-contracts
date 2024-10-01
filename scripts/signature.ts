@@ -1,6 +1,8 @@
 const { ethers } = require('ethers');
 
 // Example private key (use an appropriate one)
+// const privateKey =
+//   '503f38a9c967ed597e47fe25643985f032b072db8075426a92110f82df48dfcb';
 const privateKey =
   '641c13a4e6eee4cb119d971f94dab38beb51c6cfea85f2d4f83846501f017822';
 
@@ -28,7 +30,7 @@ const types = {
 const value = {
   buyer: '0xe273f8beEb0ca112292c4aC407c35EE604E54cD2',
   totalAmount: '600000000',
-  referral: '0x9A7e139fA1292a4E83BCA8d39AFe4cB5dC343D6D',
+  referral: '0xe273f8beEb0ca112292c4aC407c35EE604E54cD2',
 };
 
 async function signTypedData() {

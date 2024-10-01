@@ -15,7 +15,7 @@ interface IMatrixNFT is IERC721 {
 contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
-    IERC20 public usdtToken;
+    IERC20 public immutable usdtToken;
     bool public isPrivateSaleActive;
     bool public isPublicSaleActive;
 
@@ -23,7 +23,11 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     address public accountingAddress;
 
     bytes32 private constant SALE_TYPEHASH =
-        keccak256("Sale(address buyer,uint256 totalAmount,address referral)");
+        keccak256(
+            "Sale(address buyer,uint256 totalAmount,address referral,DeviceOrder[] orders)"
+        );
+    bytes32 private constant DEVICE_ORDER_TYPEHASH =
+        keccak256("DeviceOrder(uint8 deviceType,uint256 quantity)");
 
     enum DeviceType {
         Phone,
@@ -47,8 +51,14 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     mapping(DeviceType => address) public nftContracts;
     mapping(address => uint256) public referralRewards;
 
+    // Immutable device prices (in USDT)
+    uint256 public constant PHONE_PRICE = 699 * 10 ** 6; // 699 USDT
+    uint256 public constant MATRIX_PRICE = 199 * 10 ** 6; // 199 USDT
+    uint256 public constant AI_AGENT_ONE_PRICE = 699 * 10 ** 6; // 699 USDT
+    uint256 public constant AI_AGENT_PRO_PRICE = 1299 * 10 ** 6; // 1299 USDT
+    uint256 public constant AI_AGENT_ULTRA_PRICE = 899 * 10 ** 6; // 899 USDT
+
     event PaymentReceived(PaymentData paymentData);
-    event UsdtTokenAddressSet(address tokenAddress);
     event PrivateSaleStateChanged(bool isActive);
     event PublicSaleStateChanged(bool isActive);
     event SignerAddressUpdated(address newSigner);
@@ -68,7 +78,6 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             "Must provide 5 NFT contract addresses"
         );
         usdtToken = IERC20(_usdtToken);
-        emit UsdtTokenAddressSet(_usdtToken);
 
         for (uint256 i = 0; i < _nftContracts.length; i++) {
             nftContracts[DeviceType(i)] = _nftContracts[i];
@@ -80,11 +89,6 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
 
         accountingAddress = _accountingAddress;
         emit AccountingAddressUpdated(_accountingAddress);
-    }
-
-    function setUsdtTokenAddress(address tokenAddress) external onlyOwner {
-        usdtToken = IERC20(tokenAddress);
-        emit UsdtTokenAddressSet(tokenAddress);
     }
 
     function setPrivateSaleActive(bool _isActive) external onlyOwner {
@@ -142,6 +146,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         require(signer == signerAddress, "Invalid signature");
     }
 
+    function getDomainSeparator() external view returns (bytes32) {
+        return _domainSeparatorV4();
+    }
+
     function processPayment(uint256 totalAmount, address referral) internal {
         uint256 amountToAccounting = totalAmount;
         if (referral != address(0)) {
@@ -158,6 +166,27 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         );
     }
 
+    function getDevicePrice(
+        DeviceType deviceType
+    ) public pure returns (uint256) {
+        if (deviceType == DeviceType.Phone) return PHONE_PRICE;
+        if (deviceType == DeviceType.Matrix) return MATRIX_PRICE;
+        if (deviceType == DeviceType.AiAgentOne) return AI_AGENT_ONE_PRICE;
+        if (deviceType == DeviceType.AiAgentPro) return AI_AGENT_PRO_PRICE;
+        if (deviceType == DeviceType.AiAgentUltra) return AI_AGENT_ULTRA_PRICE;
+        revert("Invalid device type");
+    }
+
+    function calculateTotalAmount(
+        DeviceOrder[] memory orders
+    ) internal pure returns (uint256) {
+        uint256 total = 0;
+        for (uint256 i = 0; i < orders.length; i++) {
+            total += getDevicePrice(orders[i].deviceType) * orders[i].quantity;
+        }
+        return total;
+    }
+
     function payPrivateSale(
         uint256 totalAmount,
         DeviceOrder[] calldata orders,
@@ -167,6 +196,12 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         require(isPrivateSaleActive, "Private sale is not active");
         require(totalAmount > 0, "Total amount must be greater than zero");
         require(orders.length > 0, "Must order at least one device");
+
+        uint256 calculatedTotal = calculateTotalAmount(orders);
+        require(
+            calculatedTotal == totalAmount,
+            "Total amount does not match order prices"
+        );
 
         verifySignature(msg.sender, totalAmount, referral, signature);
 
@@ -205,6 +240,12 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         require(isPublicSaleActive, "Public sale is not active");
         require(totalAmount > 0, "Total amount must be greater than zero");
         require(orders.length > 0, "Must order at least one device");
+
+        uint256 calculatedTotal = calculateTotalAmount(orders);
+        require(
+            calculatedTotal == totalAmount,
+            "Total amount does not match order prices"
+        );
 
         verifySignature(msg.sender, totalAmount, referral, signature);
 
