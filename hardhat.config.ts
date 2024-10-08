@@ -1,8 +1,10 @@
 import { HardhatUserConfig } from 'hardhat/types'
 import 'dotenv/config'
 import '@nomicfoundation/hardhat-toolbox'
+import '@openzeppelin/hardhat-upgrades'
 
-const privateKey = process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY
+const privateKey =
+  process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY
 
 const config: HardhatUserConfig = {
   solidity: '0.8.23',

@@ -20,7 +20,7 @@ contract MatrixNFT is
     mapping(address => bool) public operators;
 
     bytes32 public whitelistRoot;
-    bool public isWhitelistActive = false;
+    bool public isWhitelistActive;
 
     event WhitelistStatusChanged(bool isActive);
     event MerkleRootChanged(bytes32 newMerkleRoot);
@@ -38,7 +38,9 @@ contract MatrixNFT is
         __ERC721_init(name, symbol);
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
+
         tokenCounter = 0;
+        isWhitelistActive = false;
     }
 
     modifier onlyOwnerOrOperator() {
