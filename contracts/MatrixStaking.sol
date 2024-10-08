@@ -33,14 +33,9 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 timestamp;
     }
 
-    struct NFTStake {
-        uint256 stakeTimestamp;
-        uint256 firstStakeTimestamp;
-    }
-
     mapping(address => Stake) public tokenStakes;
-    mapping(address => mapping(NFTType => mapping(uint256 => NFTStake)))
-        public nftStakes; // user => NFTType => tokenId => NFTStake
+    mapping(address => mapping(NFTType => mapping(uint256 => uint256)))
+        public nftStakes; // user => NFTType => tokenId => stakeTimestamp
     mapping(NFTType => uint256) public totalStakedNFTs; // Total staked NFTs for each type
     mapping(address => uint256) public userTotalStakedNFTs; // Total staked NFTs for each user
 
@@ -48,8 +43,6 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
 
     address public rewardSigner;
     mapping(address => mapping(RewardType => uint256)) public nonces;
-
-    uint256 public constant PHONE_STAKE_LOCK_PERIOD = 30 days;
 
     bytes32 private constant CLAIM_TYPEHASH =
         keccak256(
@@ -66,8 +59,7 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
         address indexed user,
         NFTType nftType,
         uint256 tokenId,
-        uint256 timestamp,
-        uint256 firstStakeTimestamp
+        uint256 timestamp
     );
     event NFTUnstaked(
         address indexed user,
@@ -154,44 +146,16 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
             "Not the owner of the NFT"
         );
         require(
-            nftStakes[msg.sender][nftType][tokenId].stakeTimestamp == 0,
+            nftStakes[msg.sender][nftType][tokenId] == 0,
             "NFT already staked"
         );
 
         uint256 timestamp = block.timestamp;
-
-        if (nftType == NFTType.Phone) {
-            require(
-                nftStakes[msg.sender][nftType][tokenId].firstStakeTimestamp ==
-                    0 ||
-                    timestamp <=
-                    nftStakes[msg.sender][nftType][tokenId]
-                        .firstStakeTimestamp +
-                        PHONE_STAKE_LOCK_PERIOD,
-                "Phone NFT can't be restaked after 30 days from first stake"
-            );
-
-            if (
-                nftStakes[msg.sender][nftType][tokenId].firstStakeTimestamp == 0
-            ) {
-                nftStakes[msg.sender][nftType][tokenId]
-                    .firstStakeTimestamp = timestamp;
-            }
-        }
-
-        nftContract.transferFrom(msg.sender, address(this), tokenId);
-        nftStakes[msg.sender][nftType][tokenId].stakeTimestamp = timestamp;
-
+        nftStakes[msg.sender][nftType][tokenId] = timestamp;
         totalStakedNFTs[nftType]++;
         userTotalStakedNFTs[msg.sender]++;
 
-        emit NFTStaked(
-            msg.sender,
-            nftType,
-            tokenId,
-            timestamp,
-            nftStakes[msg.sender][nftType][tokenId].firstStakeTimestamp
-        );
+        emit NFTStaked(msg.sender, nftType, tokenId, timestamp);
     }
 
     function unstakeNFT(
@@ -200,17 +164,17 @@ contract MatrixStaking is ReentrancyGuard, Ownable, EIP712 {
     ) external nonReentrant {
         IERC721 nftContract = nftContracts[nftType];
         require(address(nftContract) != address(0), "NFT type not supported");
+        require(nftStakes[msg.sender][nftType][tokenId] != 0, "NFT not staked");
         require(
-            nftStakes[msg.sender][nftType][tokenId].stakeTimestamp != 0,
-            "NFT not staked"
+            nftContract.ownerOf(tokenId) == msg.sender,
+            "Not the owner of the NFT"
         );
 
         uint256 timestamp = block.timestamp;
-        // uint256 firstStakeTimestamp = nftStakes[msg.sender][nftType][tokenId]
-        //     .firstStakeTimestamp;
 
-        delete nftStakes[msg.sender][nftType][tokenId].stakeTimestamp;
-        nftContract.transferFrom(address(this), msg.sender, tokenId);
+        if (nftType != NFTType.Phone && nftType != NFTType.Matrix) {
+            delete nftStakes[msg.sender][nftType][tokenId];
+        }
 
         totalStakedNFTs[nftType]--;
         userTotalStakedNFTs[msg.sender]--;
