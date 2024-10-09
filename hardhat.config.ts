@@ -1,27 +1,13 @@
 import { HardhatUserConfig } from 'hardhat/types'
 import 'dotenv/config'
 import '@nomicfoundation/hardhat-toolbox'
-import { extendConfig } from 'hardhat/config';
+import '@openzeppelin/hardhat-upgrades'
 
-extendConfig((config) => {
-  if (!config.etherscan.customChains) {
-    config.etherscan.customChains = [];
-  }
-
-  config.etherscan.customChains.push({
-    network: "metabitMainnet",
-    chainId: 4321,
-    urls: {
-      apiURL: "https://api.metabitglobal.io/api",
-      browserURL: "https://www.metabitglobal.io",
-    },
-  });
-});
-
-const privateKey = process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY
+const privateKey =
+  process.env.NODE_ENV === 'production' ? process.env.MAINNET_PRIVATE_KEY : process.env.TESTNET_PRIVATE_KEY
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.20',
+  solidity: '0.8.23',
   networks: {
     bscTestnet: {
       url: process.env.TESTNET_BSC_PROJECT_URL,
@@ -34,18 +20,11 @@ const config: HardhatUserConfig = {
       accounts: [`0x${privateKey}`],
       gasPrice: 20000000000,
     },
-    metabitMainnet: {
-      url: 'https://mainnet.rpc.metabitglobal.com/',
-      chainId: 4321,
-      accounts: [`0x${privateKey}`],
-      gasPrice: 20000000000,
-    },
   },
   etherscan: {
     apiKey: {
       bscTestnet: process.env.BSCSCAN_API_KEY!,
       bscMainnet: process.env.BSCSCAN_API_KEY!,
-      metabitMainnet: process.env.ETHERSCAN_API_KEY!,
     },
   },
 }

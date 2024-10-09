@@ -1,43 +1,47 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.23;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
-contract MLinkWifi is ERC721, Ownable {
+contract MatrixMint is
+    Initializable,
+    ERC721Upgradeable,
+    OwnableUpgradeable,
+    UUPSUpgradeable
+{
     uint256 public tokenCounter;
     string private baseTokenURI;
-    address public operator;
-    mapping(address => bool) public whitelistedContracts;
+    mapping(address => bool) public operators;
 
-    constructor(
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    function initialize(
+        string memory name,
+        string memory symbol,
         address initialOwner
-    ) ERC721("MLinkWifi", "MLKWIFI") Ownable(initialOwner) {
+    ) public initializer {
+        __ERC721_init(name, symbol);
+        __Ownable_init(initialOwner);
+        __UUPSUpgradeable_init();
         tokenCounter = 0;
     }
 
     modifier onlyOwnerOrOperator() {
         require(
-            msg.sender == owner() || msg.sender == operator,
-            "Caller is not the owner or operator"
+            msg.sender == owner() || operators[msg.sender],
+            "Caller is not the owner or an operator"
         );
         _;
     }
 
-    function setOperator(address _operator) external onlyOwner {
-        operator = _operator;
-    }
-
-    function addWhitelistedContract(
-        address contractAddress
-    ) external onlyOwner {
-        whitelistedContracts[contractAddress] = true;
-    }
-
-    function removeWhitelistedContract(
-        address contractAddress
-    ) external onlyOwner {
-        whitelistedContracts[contractAddress] = false;
+    function setOperator(address _operator, bool _status) external onlyOwner {
+        operators[_operator] = _status;
     }
 
     function mint(address to, uint256 quantity) external onlyOwnerOrOperator {
@@ -71,11 +75,9 @@ contract MLinkWifi is ERC721, Ownable {
         address to,
         uint256 tokenId,
         address auth
-    ) internal override(ERC721) returns (address) {
+    ) internal override(ERC721Upgradeable) returns (address) {
         address from = _ownerOf(tokenId);
-        if (
-            from != address(0) && to != address(0) && !whitelistedContracts[to]
-        ) {
+        if (from != address(0)) {
             revert("This token is soulbound and cannot be transferred");
         }
 
@@ -95,4 +97,8 @@ contract MLinkWifi is ERC721, Ownable {
         );
         return baseTokenURI;
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

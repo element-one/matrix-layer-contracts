@@ -1,15 +1,16 @@
 {
   "scripts": {
     "deploy:payment": "hardhat run scripts/deployPayment.ts --network bscTestnet",
-    "deploy:mlink": "hardhat run scripts/deployMLink.ts --network metabitMainnet",
+    "deploy:nft": "hardhat run scripts/deployNFT.ts --network bscTestnet",
+    "update:nft": "hardhat run scripts/updateNFT.ts --network bscTestnet",
     "deploy:payment:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployPayment.ts --network bscMainnet",
-    "deploy:mlink:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployMLink.ts --network metabitMainnet",
+    "deploy:nfts:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployNFT.ts --network bscMainnet",
     "operator": "ts-node scripts/setOperator.ts",
     "operator:mainnet": "cross-env NODE_ENV=production ts-node scripts/setOperator.ts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
-    "@nomicfoundation/hardhat-ethers": "^3.0.0",
+    "@nomicfoundation/hardhat-ethers": "^3.0.8",
     "@nomicfoundation/hardhat-ignition": "^0.15.0",
     "@nomicfoundation/hardhat-ignition-ethers": "^0.15.0",
     "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
@@ -23,8 +24,8 @@
     "chai": "^4.2.0",
     "cross-env": "^7.0.3",
     "dotenv": "^16.4.5",
-    "ethers": "^6.13.2",
-    "hardhat": "^2.22.8",
+    "ethers": "^6.13.3",
+    "hardhat": "^2.22.12",
     "hardhat-gas-reporter": "^1.0.8",
     "solidity-coverage": "^0.8.0",
     "ts-node": ">=8.0.0",
@@ -32,6 +33,8 @@
     "typescript": ">=4.5.0"
   },
   "dependencies": {
-    "@openzeppelin/contracts": "^5.0.2"
+    "@openzeppelin/contracts": "^5.0.2",
+    "@openzeppelin/contracts-upgradeable": "^5.0.2",
+    "@openzeppelin/hardhat-upgrades": "^3.4.0"
   }
 }
