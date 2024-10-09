@@ -1,46 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract MatrixNFT is
-    Initializable,
-    ERC721Upgradeable,
-    OwnableUpgradeable,
-    UUPSUpgradeable
-{
-    using MerkleProof for bytes32[];
-
+contract MatrixNFT is ERC721, Ownable {
     uint256 public tokenCounter;
     string private baseTokenURI;
     mapping(address => bool) public operators;
 
-    bytes32 public whitelistRoot;
-    bool public isWhitelistActive;
-
-    event WhitelistStatusChanged(bool isActive);
-    event MerkleRootChanged(bytes32 newMerkleRoot);
-
-    /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor() {
-        _disableInitializers();
-    }
-
-    function initialize(
+    constructor(
         string memory name,
         string memory symbol,
         address initialOwner
-    ) public initializer {
-        __ERC721_init(name, symbol);
-        __Ownable_init(initialOwner);
-        __UUPSUpgradeable_init();
-
+    ) ERC721(name, symbol) Ownable(initialOwner) {
         tokenCounter = 0;
-        isWhitelistActive = false;
     }
 
     modifier onlyOwnerOrOperator() {
@@ -55,34 +29,11 @@ contract MatrixNFT is
         operators[_operator] = _status;
     }
 
-    function setMerkleRoot(bytes32 _whitelistRoot) external onlyOwner {
-        whitelistRoot = _whitelistRoot;
-        emit MerkleRootChanged(_whitelistRoot);
-    }
-
-    function setWhitelistStatus(bool _isActive) external onlyOwner {
-        isWhitelistActive = _isActive;
-        emit WhitelistStatusChanged(_isActive);
-    }
-
     function mint(address to, uint256 quantity) external onlyOwnerOrOperator {
         require(quantity > 0, "Quantity must be greater than zero");
         for (uint256 i = 0; i < quantity; i++) {
             _mintToken(to);
         }
-    }
-
-    function whitelistMint(address to, bytes32[] calldata proof) external {
-        require(isWhitelistActive, "Whitelist minting is not active");
-        require(
-            MerkleProof.verify(
-                proof,
-                whitelistRoot,
-                keccak256(abi.encodePacked(to))
-            ),
-            "Not in whitelist"
-        );
-        _mintToken(to);
     }
 
     function _mintToken(address to) internal {
@@ -109,7 +60,7 @@ contract MatrixNFT is
         address to,
         uint256 tokenId,
         address auth
-    ) internal override(ERC721Upgradeable) returns (address) {
+    ) internal override(ERC721) returns (address) {
         address from = _ownerOf(tokenId);
         if (from != address(0)) {
             revert("This token is soulbound and cannot be transferred");
@@ -131,8 +82,4 @@ contract MatrixNFT is
         );
         return baseTokenURI;
     }
-
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
 }

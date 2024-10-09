@@ -5,6 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
 
 contract MatrixMint is
     Initializable,
@@ -12,11 +13,25 @@ contract MatrixMint is
     OwnableUpgradeable,
     UUPSUpgradeable
 {
+    using MerkleProof for bytes32[];
+
     uint256 public tokenCounter;
     string private baseTokenURI;
     mapping(address => bool) public operators;
 
-    /// @custom:oz-upgrades-unsafe-allow constructor
+    bytes32 public whitelistRoot;
+    bool public isWhitelistActive;
+    bool public isPublicMintActive;
+
+    uint256 public maxMintPerTransaction;
+    uint256 public maxMintPerWallet;
+
+    mapping(address => uint256) public mintedPerWallet;
+
+    event WhitelistStatusChanged(bool isActive);
+    event PublicMintStatusChanged(bool isActive);
+    event MerkleRootChanged(bytes32 newMerkleRoot);
+
     constructor() {
         _disableInitializers();
     }
@@ -29,7 +44,12 @@ contract MatrixMint is
         __ERC721_init(name, symbol);
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
+
         tokenCounter = 0;
+        isWhitelistActive = false;
+        isPublicMintActive = false;
+        maxMintPerTransaction = 5;
+        maxMintPerWallet = 10;
     }
 
     modifier onlyOwnerOrOperator() {
@@ -44,8 +64,59 @@ contract MatrixMint is
         operators[_operator] = _status;
     }
 
+    function setWhitelistRoot(bytes32 _whitelistRoot) external onlyOwner {
+        whitelistRoot = _whitelistRoot;
+        emit MerkleRootChanged(_whitelistRoot);
+    }
+
+    function setWhitelistStatus(bool _isActive) external onlyOwner {
+        isWhitelistActive = _isActive;
+        emit WhitelistStatusChanged(_isActive);
+    }
+
+    function setPublicMintStatus(bool _isActive) external onlyOwner {
+        isPublicMintActive = _isActive;
+        emit PublicMintStatusChanged(_isActive);
+    }
+
+    function setMaxMintLimits(
+        uint256 _perTransaction,
+        uint256 _perWallet
+    ) external onlyOwner {
+        maxMintPerTransaction = _perTransaction;
+        maxMintPerWallet = _perWallet;
+    }
+
     function mint(address to, uint256 quantity) external onlyOwnerOrOperator {
         require(quantity > 0, "Quantity must be greater than zero");
+        for (uint256 i = 0; i < quantity; i++) {
+            _mintToken(to);
+        }
+    }
+
+    function whitelistMint(
+        address to,
+        uint256 quantity,
+        bytes32[] calldata proof
+    ) external {
+        require(isWhitelistActive, "Whitelist minting is not active");
+        require(
+            quantity > 0 && quantity <= maxMintPerTransaction,
+            "Invalid quantity"
+        );
+        require(
+            mintedPerWallet[to] + quantity <= maxMintPerWallet,
+            "Exceeds max mint per wallet"
+        );
+        require(
+            MerkleProof.verify(
+                proof,
+                whitelistRoot,
+                keccak256(abi.encodePacked(to))
+            ),
+            "Not in whitelist"
+        );
+
         for (uint256 i = 0; i < quantity; i++) {
             _mintToken(to);
         }
