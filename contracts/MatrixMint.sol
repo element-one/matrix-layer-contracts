@@ -6,12 +6,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
+import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract MatrixMint is
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable,
-    UUPSUpgradeable
+    UUPSUpgradeable,
+    ReentrancyGuard
 {
     using MerkleProof for bytes32[];
 
@@ -98,7 +100,7 @@ contract MatrixMint is
         address to,
         uint256 quantity,
         bytes32[] calldata proof
-    ) external {
+    ) external nonReentrant {
         require(isWhitelistActive, "Whitelist minting is not active");
         require(
             quantity > 0 && quantity <= maxMintPerTransaction,
@@ -120,6 +122,23 @@ contract MatrixMint is
         for (uint256 i = 0; i < quantity; i++) {
             _mintToken(to);
         }
+    }
+
+    function publicMint(address to, uint256 quantity) external nonReentrant {
+        require(isPublicMintActive, "Public minting is not active");
+        require(
+            quantity > 0 && quantity <= maxMintPerTransaction,
+            "Invalid quantity"
+        );
+        require(
+            mintedPerWallet[to] + quantity <= maxMintPerWallet,
+            "Exceeds max mint per wallet"
+        );
+
+        for (uint256 i = 0; i < quantity; i++) {
+            _mintToken(to);
+        }
+        mintedPerWallet[to] += quantity;
     }
 
     function _mintToken(address to) internal {
@@ -172,4 +191,9 @@ contract MatrixMint is
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}
+
+    function withdraw() external onlyOwner {
+        uint256 balance = address(this).balance;
+        payable(owner()).transfer(balance);
+    }
 }

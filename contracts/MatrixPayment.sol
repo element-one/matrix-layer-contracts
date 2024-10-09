@@ -23,7 +23,9 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     address public accountingAddress;
 
     bytes32 private constant SALE_TYPEHASH =
-        keccak256("Sale(address buyer,uint256 totalAmount,address referral)");
+        keccak256(
+            "Sale(address buyer,uint256 totalAmount,address referral,bool isWhitelisted)"
+        );
 
     enum DeviceType {
         Phone,
@@ -131,10 +133,17 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         address buyer,
         uint256 totalAmount,
         address referral,
+        bool isWhitelisted,
         bytes memory signature
     ) internal view {
         bytes32 structHash = keccak256(
-            abi.encode(SALE_TYPEHASH, buyer, totalAmount, referral)
+            abi.encode(
+                SALE_TYPEHASH,
+                buyer,
+                totalAmount,
+                referral,
+                isWhitelisted
+            )
         );
         bytes32 hash = _hashTypedDataV4(structHash);
         address signer = hash.recover(signature);
@@ -145,14 +154,18 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         return _domainSeparatorV4();
     }
 
-    function processPayment(uint256 totalAmount, address referral) internal {
+    function processPayment(
+        uint256 totalAmount,
+        address referral,
+        bool isWhitelisted
+    ) internal {
         uint256 amountToAccounting = totalAmount;
-        if (referral != address(0)) {
-            amountToAccounting = (totalAmount * 90) / 100;
-            uint256 amountToReferral = totalAmount - amountToAccounting;
-            referralRewards[referral] += amountToReferral;
 
-            emit ReferralRewardAdded(referral, amountToReferral);
+        if (!isWhitelisted && referral != address(0)) {
+            uint256 referralReward = (totalAmount * 10) / 100; // 10% referral reward
+            amountToAccounting -= referralReward;
+            referralRewards[referral] += referralReward;
+            emit ReferralRewardAdded(referral, referralReward);
         }
 
         require(
@@ -185,6 +198,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         uint256 totalAmount,
         DeviceOrder[] calldata orders,
         address referral,
+        bool isWhitelisted,
         bytes memory signature
     ) public nonReentrant {
         require(isPrivateSaleActive, "Private sale is not active");
@@ -197,14 +211,20 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             "Total amount does not match order prices"
         );
 
-        verifySignature(msg.sender, totalAmount, referral, signature);
+        verifySignature(
+            msg.sender,
+            totalAmount,
+            referral,
+            isWhitelisted,
+            signature
+        );
 
         require(
             usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
 
-        processPayment(totalAmount, referral);
+        processPayment(totalAmount, referral, isWhitelisted);
 
         for (uint256 i = 0; i < orders.length; i++) {
             address nftContract = nftContracts[orders[i].deviceType];
@@ -229,6 +249,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         uint256 totalAmount,
         DeviceOrder[] calldata orders,
         address referral,
+        bool isWhitelisted,
         bytes memory signature
     ) public nonReentrant {
         require(isPublicSaleActive, "Public sale is not active");
@@ -241,14 +262,20 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             "Total amount does not match order prices"
         );
 
-        verifySignature(msg.sender, totalAmount, referral, signature);
+        verifySignature(
+            msg.sender,
+            totalAmount,
+            referral,
+            isWhitelisted,
+            signature
+        );
 
         require(
             usdtToken.transferFrom(msg.sender, address(this), totalAmount),
             "Token transfer failed"
         );
 
-        processPayment(totalAmount, referral);
+        processPayment(totalAmount, referral, isWhitelisted);
 
         for (uint256 i = 0; i < orders.length; i++) {
             address nftContract = nftContracts[orders[i].deviceType];
