@@ -21,8 +21,9 @@ const domain = {
 const types = {
   Sale: [
     { name: 'buyer', type: 'address' },
-    { name: 'totalAmount', type: 'uint256' },
-    { name: 'referral', type: 'address' },
+    { name: 'totalAmount', type: 'uint256' }, // 10e6
+    { name: 'referral', type: 'address' }, // 0x0000000000000000000000000000000000000000 no referral
+    { name: 'isWhitelisted', type: 'bool' },
   ],
 };
 
@@ -31,6 +32,7 @@ const value = {
   buyer: '0xe273f8beEb0ca112292c4aC407c35EE604E54cD2',
   totalAmount: '199000000',
   referral: '0xe273f8beEb0ca112292c4aC407c35EE604E54cD2',
+  isWhitelisted: true, // is team wallet
 };
 
 async function signTypedData() {
