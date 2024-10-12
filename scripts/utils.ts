@@ -45,4 +45,6 @@ export async function deployContract(contractName: string, params: any[] = [], f
 
   // Verify the contract
   verifyContract(deployedAddress, `contracts/${contractName}.sol`, contractName, constructorArguments)
+
+  return deployedAddress
 }
