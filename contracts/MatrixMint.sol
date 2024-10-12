@@ -166,11 +166,6 @@ contract MatrixMint is
         uint256 tokenId,
         address auth
     ) internal override(ERC721Upgradeable) returns (address) {
-        address from = _ownerOf(tokenId);
-        if (from != address(0)) {
-            revert("This token is soulbound and cannot be transferred");
-        }
-
         return super._update(to, tokenId, auth);
     }
 
