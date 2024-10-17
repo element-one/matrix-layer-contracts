@@ -24,7 +24,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
 
     bytes32 private constant SALE_TYPEHASH =
         keccak256(
-            "Sale(address buyer,uint256 totalAmount,address directReferral,uint256 directPercentage,address indirectReferral,uint256 indirectPercentage,bool isWhitelisted)"
+            "Sale(address buyer,uint256 totalAmount,address directReferral,uint256 directPercentage,address level1Referral,uint256 level1Percentage,address level2Referral,uint256 level2Percentage,address level3Referral,uint256 level3Percentage,address level4Referral,uint256 level4Percentage,address level5Referral,uint256 level5Percentage,bool isWhitelisted)"
         );
 
     enum DeviceType {
@@ -134,8 +134,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         uint256 totalAmount,
         address directReferral,
         uint256 directPercentage,
-        address indirectReferral,
-        uint256 indirectPercentage,
+        address[5] calldata levelReferrals,
+        uint256[5] calldata levelPercentages,
         bool isWhitelisted,
         bytes memory signature
     ) internal view {
@@ -146,8 +146,16 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
                 totalAmount,
                 directReferral,
                 directPercentage,
-                indirectReferral,
-                indirectPercentage,
+                levelReferrals[0],
+                levelPercentages[0],
+                levelReferrals[1],
+                levelPercentages[1],
+                levelReferrals[2],
+                levelPercentages[2],
+                levelReferrals[3],
+                levelPercentages[3],
+                levelReferrals[4],
+                levelPercentages[4],
                 isWhitelisted
             )
         );
@@ -164,14 +172,13 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         uint256 totalAmount,
         address directReferral,
         uint256 directPercentage,
-        address indirectReferral,
-        uint256 indirectPercentage,
+        address[5] calldata levelReferrals,
+        uint256[5] calldata levelPercentages,
         bool isWhitelisted
     ) internal {
         uint256 amountToAccounting = totalAmount;
 
         if (!isWhitelisted) {
-            // no referral fee for whitelisted users
             if (directReferral != address(0)) {
                 uint256 directReward = (totalAmount * directPercentage) / 100;
                 amountToAccounting -= directReward;
@@ -179,12 +186,14 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
                 emit ReferralRewardAdded(directReferral, directReward);
             }
 
-            if (indirectReferral != address(0)) {
-                uint256 indirectReward = (totalAmount * indirectPercentage) /
-                    100;
-                amountToAccounting -= indirectReward;
-                referralRewards[indirectReferral] += indirectReward;
-                emit ReferralRewardAdded(indirectReferral, indirectReward);
+            for (uint256 i = 0; i < 5; i++) {
+                if (levelReferrals[i] != address(0)) {
+                    uint256 levelReward = (totalAmount * levelPercentages[i]) /
+                        100;
+                    amountToAccounting -= levelReward;
+                    referralRewards[levelReferrals[i]] += levelReward;
+                    emit ReferralRewardAdded(levelReferrals[i], levelReward);
+                }
             }
         }
 
@@ -219,8 +228,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         DeviceOrder[] calldata orders,
         address directReferral,
         uint256 directPercentage,
-        address indirectReferral,
-        uint256 indirectPercentage,
+        address[5] calldata levelReferrals,
+        uint256[5] calldata levelPercentages,
         bool isWhitelisted,
         bytes memory signature
     ) public nonReentrant {
@@ -239,8 +248,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             totalAmount,
             directReferral,
             directPercentage,
-            indirectReferral,
-            indirectPercentage,
+            levelReferrals,
+            levelPercentages,
             isWhitelisted,
             signature
         );
@@ -254,8 +263,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             totalAmount,
             directReferral,
             directPercentage,
-            indirectReferral,
-            indirectPercentage,
+            levelReferrals,
+            levelPercentages,
             isWhitelisted
         );
 
@@ -283,8 +292,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         DeviceOrder[] calldata orders,
         address directReferral,
         uint256 directPercentage,
-        address indirectReferral,
-        uint256 indirectPercentage,
+        address[5] calldata levelReferrals,
+        uint256[5] calldata levelPercentages,
         bool isWhitelisted,
         bytes memory signature
     ) public nonReentrant {
@@ -303,8 +312,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             totalAmount,
             directReferral,
             directPercentage,
-            indirectReferral,
-            indirectPercentage,
+            levelReferrals,
+            levelPercentages,
             isWhitelisted,
             signature
         );
@@ -318,8 +327,8 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             totalAmount,
             directReferral,
             directPercentage,
-            indirectReferral,
-            indirectPercentage,
+            levelReferrals,
+            levelPercentages,
             isWhitelisted
         );
 
