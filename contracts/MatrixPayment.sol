@@ -24,7 +24,7 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
 
     bytes32 private constant SALE_TYPEHASH =
         keccak256(
-            "Sale(address buyer,uint256 totalAmount,address referral,bool isWhitelisted)"
+            "Sale(address buyer,uint256 totalAmount,address directReferral,uint256 directPercentage,address indirectReferral,uint256 indirectPercentage,bool isWhitelisted)"
         );
 
     enum DeviceType {
@@ -132,7 +132,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     function verifySignature(
         address buyer,
         uint256 totalAmount,
-        address referral,
+        address directReferral,
+        uint256 directPercentage,
+        address indirectReferral,
+        uint256 indirectPercentage,
         bool isWhitelisted,
         bytes memory signature
     ) internal view {
@@ -141,7 +144,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
                 SALE_TYPEHASH,
                 buyer,
                 totalAmount,
-                referral,
+                directReferral,
+                directPercentage,
+                indirectReferral,
+                indirectPercentage,
                 isWhitelisted
             )
         );
@@ -156,16 +162,30 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
 
     function processPayment(
         uint256 totalAmount,
-        address referral,
+        address directReferral,
+        uint256 directPercentage,
+        address indirectReferral,
+        uint256 indirectPercentage,
         bool isWhitelisted
     ) internal {
         uint256 amountToAccounting = totalAmount;
 
-        if (!isWhitelisted && referral != address(0)) {
-            uint256 referralReward = (totalAmount * 10) / 100; // 10% referral reward
-            amountToAccounting -= referralReward;
-            referralRewards[referral] += referralReward;
-            emit ReferralRewardAdded(referral, referralReward);
+        if (!isWhitelisted) {
+            // no referral fee for whitelisted users
+            if (directReferral != address(0)) {
+                uint256 directReward = (totalAmount * directPercentage) / 100;
+                amountToAccounting -= directReward;
+                referralRewards[directReferral] += directReward;
+                emit ReferralRewardAdded(directReferral, directReward);
+            }
+
+            if (indirectReferral != address(0)) {
+                uint256 indirectReward = (totalAmount * indirectPercentage) /
+                    100;
+                amountToAccounting -= indirectReward;
+                referralRewards[indirectReferral] += indirectReward;
+                emit ReferralRewardAdded(indirectReferral, indirectReward);
+            }
         }
 
         require(
@@ -197,7 +217,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     function payPrivateSale(
         uint256 totalAmount,
         DeviceOrder[] calldata orders,
-        address referral,
+        address directReferral,
+        uint256 directPercentage,
+        address indirectReferral,
+        uint256 indirectPercentage,
         bool isWhitelisted,
         bytes memory signature
     ) public nonReentrant {
@@ -214,7 +237,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         verifySignature(
             msg.sender,
             totalAmount,
-            referral,
+            directReferral,
+            directPercentage,
+            indirectReferral,
+            indirectPercentage,
             isWhitelisted,
             signature
         );
@@ -224,7 +250,14 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             "Token transfer failed"
         );
 
-        processPayment(totalAmount, referral, isWhitelisted);
+        processPayment(
+            totalAmount,
+            directReferral,
+            directPercentage,
+            indirectReferral,
+            indirectPercentage,
+            isWhitelisted
+        );
 
         for (uint256 i = 0; i < orders.length; i++) {
             address nftContract = nftContracts[orders[i].deviceType];
@@ -248,7 +281,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     function payPublicSale(
         uint256 totalAmount,
         DeviceOrder[] calldata orders,
-        address referral,
+        address directReferral,
+        uint256 directPercentage,
+        address indirectReferral,
+        uint256 indirectPercentage,
         bool isWhitelisted,
         bytes memory signature
     ) public nonReentrant {
@@ -265,7 +301,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
         verifySignature(
             msg.sender,
             totalAmount,
-            referral,
+            directReferral,
+            directPercentage,
+            indirectReferral,
+            indirectPercentage,
             isWhitelisted,
             signature
         );
@@ -275,7 +314,14 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
             "Token transfer failed"
         );
 
-        processPayment(totalAmount, referral, isWhitelisted);
+        processPayment(
+            totalAmount,
+            directReferral,
+            directPercentage,
+            indirectReferral,
+            indirectPercentage,
+            isWhitelisted
+        );
 
         for (uint256 i = 0; i < orders.length; i++) {
             address nftContract = nftContracts[orders[i].deviceType];
