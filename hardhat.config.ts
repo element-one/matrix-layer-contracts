@@ -6,7 +6,16 @@ import '@openzeppelin/hardhat-upgrades';
 dotenv.config();
 
 const config: HardhatUserConfig = {
-  solidity: '0.8.23',
+  solidity: {
+    version: "0.8.23",
+    settings: {
+      optimizer: {
+        enabled: true,
+        runs: 200,
+      },
+      viaIR: true,
+    },
+  },
   networks: {
     bscTestnet: {
       url: process.env.TESTNET_BSC_URL,
