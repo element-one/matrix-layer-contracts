@@ -152,3 +152,100 @@ MatrixNFT is a non-upgradeable ERC721 contract with soulbound functionality. Her
 - This contract is not upgradeable, so any changes would require deploying a new contract.
 
 Always ensure you're interacting with the correct contract address and have the necessary permissions before calling any functions.
+
+## MatrixPayment Contract Guide
+
+MatrixPayment is a contract that handles payments for device purchases, manages referral rewards, and interacts with NFT contracts for minting. Here's how to interact with its main functions:
+
+### Initialization
+
+The contract is initialized with the following parameters:
+
+- `_usdtToken`: Address of the USDT token contract
+- `_nftContracts`: Array of 5 NFT contract addresses for each device type
+- `_signerAddress`: Address authorized to sign sale messages
+- `_accountingAddress`: Address to receive accounting payments
+
+### Main Functions
+
+1. **payPrivateSale** and **payPublicSale**
+
+   - Description: Processes a sale payment, including referral rewards and NFT minting
+   - Parameters:
+     - `totalAmount`: Total amount of the purchase in USDT
+     - `orders`: Array of DeviceOrder structs (deviceType and quantity)
+     - `directReferral`: Address of the direct referrer
+     - `directPercentage`: Percentage for direct referral reward
+     - `levelReferrals`: Array of 5 addresses for level referrals
+     - `levelPercentages`: Array of 5 percentages for level referral rewards
+     - `isWhitelisted`: Boolean indicating if the buyer is whitelisted
+     - `signature`: Signature to verify the sale
+   - Authority: Anyone can call these functions when the respective sale is active
+
+2. **claimReferralReward**
+
+   - Description: Allows a user to claim their accumulated referral rewards
+   - Authority: Anyone with accumulated rewards can call this function
+
+3. **setPrivateSaleActive** and **setPublicSaleActive**
+
+   - Description: Activates or deactivates the private or public sale
+   - Parameters:
+     - `_isActive`: Boolean to set the sale status
+   - Authority: Only the owner can call these functions
+
+4. **setSignerAddress**
+
+   - Description: Updates the address authorized to sign sale messages
+   - Parameters:
+     - `_signerAddress`: New signer address
+   - Authority: Only the owner can call this function
+
+5. **setAccountingAddress**
+
+   - Description: Updates the address to receive accounting payments
+   - Parameters:
+     - `_accountingAddress`: New accounting address
+   - Authority: Only the owner can call this function
+
+6. **setNftContractAddresses**
+
+   - Description: Updates the NFT contract addresses for each device type
+   - Parameters:
+     - `nftAddresses`: Array of 5 new NFT contract addresses
+   - Authority: Only the owner can call this function
+
+7. **withdrawUsdt** and **withdrawETH**
+   - Description: Allows the owner to withdraw USDT or ETH from the contract
+   - Parameters:
+     - `amount`: Amount to withdraw
+   - Authority: Only the owner can call these functions
+
+### View Functions
+
+1. **getNftContractAddress**
+
+   - Description: Returns the NFT contract address for a given device type
+   - Parameters:
+     - `deviceType`: Enum value representing the device type
+
+2. **getDevicePrice**
+
+   - Description: Returns the price of a device based on its type
+   - Parameters:
+     - `deviceType`: Enum value representing the device type
+
+3. **getReferralRewards**
+   - Description: Returns the accumulated referral rewards for a given address
+   - Parameters:
+     - `referrer`: Address to check for rewards
+
+### Important Notes
+
+- The contract uses EIP-712 for signature verification of sales.
+- Referral rewards are stored in the contract and can be claimed by referrers.
+- The contract interacts with multiple NFT contracts, one for each device type.
+- Both private and public sales can be activated or deactivated by the owner.
+- The contract handles payments in USDT.
+
+Always ensure you're interacting with the correct contract address and have the necessary permissions before calling any functions.
