@@ -50,10 +50,10 @@ contract MatrixPayment is ReentrancyGuard, Ownable, EIP712 {
     mapping(address => uint256) public referralRewards;
 
     // Immutable device prices (in USDT)
-    uint256 public constant PHONE_PRICE = 699 * 10 ** 6; // 699 USDT
-    uint256 public constant AI_AGENT_ONE_PRICE = 199 * 10 ** 6; // 199 USDT
-    uint256 public constant AI_AGENT_PRO_PRICE = 699 * 10 ** 6; // 699 USDT
-    uint256 public constant AI_AGENT_ULTRA_PRICE = 899 * 10 ** 6; // 899 USDT
+    uint256 public constant PHONE_PRICE = 699 * 10 ** 18; // 699 USDT
+    uint256 public constant AI_AGENT_ONE_PRICE = 199 * 10 ** 18; // 199 USDT
+    uint256 public constant AI_AGENT_PRO_PRICE = 699 * 10 ** 18; // 699 USDT
+    uint256 public constant AI_AGENT_ULTRA_PRICE = 899 * 10 ** 18; // 899 USDT
 
     event PaymentReceived(PaymentData paymentData);
     event PrivateSaleStateChanged(bool isActive);

@@ -6,14 +6,14 @@ import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import "@openzeppelin/contracts/utils/cryptography/MerkleProof.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts-upgradeable/utils/ReentrancyGuardUpgradeable.sol";
 
 contract MatrixMint is
     Initializable,
     ERC721Upgradeable,
     OwnableUpgradeable,
     UUPSUpgradeable,
-    ReentrancyGuard
+    ReentrancyGuardUpgradeable
 {
     using MerkleProof for bytes32[];
 
@@ -34,10 +34,6 @@ contract MatrixMint is
     event PublicMintStatusChanged(bool isActive);
     event MerkleRootChanged(bytes32 newMerkleRoot);
 
-    constructor() {
-        _disableInitializers();
-    }
-
     function initialize(
         string memory name,
         string memory symbol,
@@ -46,6 +42,7 @@ contract MatrixMint is
         __ERC721_init(name, symbol);
         __Ownable_init(initialOwner);
         __UUPSUpgradeable_init();
+        __ReentrancyGuard_init();
 
         tokenCounter = 0;
         isWhitelistActive = false;
