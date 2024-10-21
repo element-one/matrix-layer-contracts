@@ -35,7 +35,7 @@ interface IERC20 {
 contract MockUSDT is IERC20 {
     string public name = "Mock USDT";
     string public symbol = "mUSDT";
-    uint8 public decimals = 6;
+    uint8 public decimals = 18;
     uint256 private _totalSupply;
 
     mapping(address => uint256) private _balances;
