@@ -8,6 +8,12 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 
+interface IMatrixNFT is IERC721 {
+    function tokensOwned(
+        address owner
+    ) external view returns (uint256[] memory);
+}
+
 contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
@@ -91,6 +97,9 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     uint256 public totalMlpReward;
     mapping(uint256 => uint256) public yearlyClaimedRewards; // year => claimed amount
 
+    // Add a mapping to track if Phone/Matrix NFTs have ever been staked
+    mapping(NFTType => mapping(uint256 => bool)) public hasBeenStaked;
+
     constructor(
         address _token,
         address _rewardSigner,
@@ -132,6 +141,15 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             nftStakes[msg.sender][nftType][tokenId] == 0,
             "NFT already staked"
         );
+
+        // Check if Phone/Matrix NFTs have been staked before
+        if (nftType == NFTType.Phone || nftType == NFTType.Matrix) {
+            require(
+                !hasBeenStaked[nftType][tokenId],
+                "NFT has been staked before"
+            );
+            hasBeenStaked[nftType][tokenId] = true;
+        }
 
         // Add approval check
         require(
@@ -184,6 +202,15 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
                     "NFT already staked"
                 );
 
+                // Check if Phone/Matrix NFTs have been staked before
+                if (nftType == NFTType.Phone || nftType == NFTType.Matrix) {
+                    require(
+                        !hasBeenStaked[nftType][tokenId],
+                        "NFT has been staked before"
+                    );
+                    hasBeenStaked[nftType][tokenId] = true;
+                }
+
                 // Check individual token approval only if not approved for all
                 if (!isApprovedForAll) {
                     require(
@@ -229,10 +256,6 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
 
         // Transfer NFT back to user
         nftContract.transferFrom(address(this), msg.sender, tokenId);
-
-        if (nftType != NFTType.Phone && nftType != NFTType.Matrix) {
-            delete nftStakes[msg.sender][nftType][tokenId];
-        }
 
         totalStakedNFTs[nftType]--;
         userTotalStakedNFTs[msg.sender]--;
@@ -395,5 +418,51 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     function getCurrentDay() public view returns (uint256) {
         return
             ((block.timestamp - vestingStartTime) % YEAR_DURATION) / 1 days + 1;
+    }
+
+    // Get user's staked NFTs for a specific NFT type
+    function getUserStakedTokenIds(
+        address user,
+        NFTType nftType
+    ) external view returns (uint256[] memory) {
+        IERC721 nftContract = nftContracts[nftType];
+        require(address(nftContract) != address(0), "NFT type not supported");
+
+        IMatrixNFT matrixContract = IMatrixNFT(address(nftContract));
+        uint256[] memory allTokens = matrixContract.tokensOwned(address(this));
+        uint256[] memory userTokens = new uint256[](allTokens.length);
+        uint256 count = 0;
+
+        for (uint256 i = 0; i < allTokens.length; i++) {
+            if (nftStakes[user][nftType][allTokens[i]] > 0) {
+                userTokens[count++] = allTokens[i];
+            }
+        }
+
+        // Resize array to actual count
+        assembly {
+            mstore(userTokens, count)
+        }
+
+        return userTokens;
+    }
+
+    // Get all user's staked NFTs across all types
+    function getUserAllStakedNFTs(
+        address user
+    )
+        external
+        view
+        returns (NFTType[] memory nftTypes, uint256[][] memory tokenIds)
+    {
+        nftTypes = new NFTType[](5);
+        tokenIds = new uint256[][](5);
+
+        for (uint i = 0; i < 5; i++) {
+            nftTypes[i] = NFTType(i);
+            tokenIds[i] = this.getUserStakedTokenIds(user, NFTType(i));
+        }
+
+        return (nftTypes, tokenIds);
     }
 }
