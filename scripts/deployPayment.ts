@@ -2,22 +2,22 @@ import { readFileSync } from 'fs';
 import { deployContract } from './utils';
 
 async function main() {
-  await deployContract('MockUSDT')
-  const tokenAddress = readFileSync('cache/MockUSDT', 'utf-8');
-  const MatrixPhoneAddress = readFileSync('cache/MatrixPhone', 'utf-8');
-  const MatrixAddress = readFileSync('cache/Matrix', 'utf-8');
-  const MatrixAiAgentOneAddress = readFileSync(
-    'cache/MatrixAiAgentOne',
-    'utf-8'
-  );
-  const MatrixAiAgentProAddress = readFileSync(
-    'cache/MatrixAiAgentPro',
-    'utf-8'
-  );
-  const MatrixAiAgentUltraAddress = readFileSync(
-    'cache/MatrixAiAgentUltra',
-    'utf-8'
-  );
+  // await deployContract('MockUSDT');
+  // const tokenAddress = readFileSync('cache/MockUSDT', 'utf-8');
+  // const MatrixPhoneAddress = readFileSync('cache/MatrixPhone', 'utf-8');
+  // const MatrixAddress = readFileSync('cache/Matrix', 'utf-8');
+  // const MatrixAiAgentOneAddress = readFileSync(
+  //   'cache/MatrixAiAgentOne',
+  //   'utf-8'
+  // );
+  // const MatrixAiAgentProAddress = readFileSync(
+  //   'cache/MatrixAiAgentPro',
+  //   'utf-8'
+  // );
+  // const MatrixAiAgentUltraAddress = readFileSync(
+  //   'cache/MatrixAiAgentUltra',
+  //   'utf-8'
+  // );
 
   await deployContract('MatrixPayment', [
     '0x55d398326f99059fF775485246999027B3197955',
@@ -29,8 +29,8 @@ async function main() {
       '0xaAf5ff4188BddF14E9c2363d5cbD637C80bA58C6',
     ],
     process.env.SIGNER_ADDRESS,
-    process.env.ACCOUNTING_ADDRESS
-  ])
+    process.env.ACCOUNTING_ADDRESS,
+  ]);
 }
 
 main().catch((error) => {
