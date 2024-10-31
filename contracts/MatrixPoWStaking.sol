@@ -101,6 +101,16 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     // Add a mapping to track if Phone/Matrix NFTs have ever been staked
     mapping(NFTType => mapping(uint256 => bool)) public hasBeenStaked;
 
+    mapping(address => bool) public operators;
+
+    modifier onlyOwnerOrOperator() {
+        require(
+            msg.sender == owner() || operators[msg.sender],
+            "Caller is not the owner or an operator"
+        );
+        _;
+    }
+
     constructor(
         address _token,
         address _rewardSigner,
@@ -121,7 +131,11 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         rewardSigner = _rewardSigner;
     }
 
-    function fundRewardPool(uint256 amount) external onlyOwner {
+    function setOperator(address _operator, bool _status) external onlyOwner {
+        operators[_operator] = _status;
+    }
+
+    function fundRewardPool(uint256 amount) external onlyOwnerOrOperator {
         require(
             mlpToken.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
