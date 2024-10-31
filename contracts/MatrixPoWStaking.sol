@@ -103,6 +103,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
 
     mapping(address => bool) public operators;
 
+    bool public maxClaimableEnabled = true;
+
     modifier onlyOwnerOrOperator() {
         require(
             msg.sender == owner() || operators[msg.sender],
@@ -327,8 +329,11 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         (uint256 year, ) = getCurrentVestingInfo();
         require(year < 5, "Vesting period ended");
 
-        uint256 maxClaimable = getMaxClaimableAmount();
-        require(amount <= maxClaimable, "Amount exceeds maximum claimable");
+        // Only check maxClaimable if enabled
+        if (maxClaimableEnabled) {
+            uint256 maxClaimable = getMaxClaimableAmount();
+            require(amount <= maxClaimable, "Amount exceeds maximum claimable");
+        }
 
         require(rewardPool >= amount, "Insufficient reward pool balance");
         rewardPool -= amount;
@@ -493,5 +498,9 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         } else {
             MINIMUM_STAKING_PERIOD = amount * 1 days;
         }
+    }
+
+    function enableMaxClaimable() external onlyOwner {
+        maxClaimableEnabled = !maxClaimableEnabled;
     }
 }
