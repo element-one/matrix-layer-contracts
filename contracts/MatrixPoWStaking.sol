@@ -295,20 +295,22 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         return unlockTime - block.timestamp;
     }
 
-    // Add function to get current vesting year and percentage
-    function getCurrentVestingInfo()
-        public
-        view
-        returns (uint256 year, uint256 percentage)
-    {
-        if (block.timestamp < vestingStartTime) return (0, 0);
+    // Get current vesting year (0-5)
+    function getCurrentVestingYear() public view returns (uint256) {
+        if (block.timestamp < vestingStartTime) return 0;
 
         uint256 timePassed = block.timestamp - vestingStartTime;
-        year = timePassed / YEAR_DURATION;
+        uint256 year = timePassed / YEAR_DURATION;
 
-        if (year >= 5) return (5, 0);
-        percentage = VESTING_PERCENTAGES[year];
-        return (year, percentage);
+        return year >= 5 ? 5 : year;
+    }
+
+    // Get current vesting percentage (40,30,15,10,5,0)
+    function getCurrentVestingPercentage() public view returns (uint256) {
+        uint256 year = getCurrentVestingYear();
+        if (year >= 5) return 0;
+
+        return VESTING_PERCENTAGES[year];
     }
 
     // Update claimReward function with daily and cumulative caps
@@ -328,7 +330,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         nonces[msg.sender]++;
 
         // Check vesting schedule
-        (uint256 year, ) = getCurrentVestingInfo();
+        uint256 year = getCurrentVestingYear();
         require(year < 5, "Vesting period ended");
 
         // Only check maxClaimable if enabled
@@ -356,9 +358,9 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
 
     // Add view function to get total rewards for current year
     function getCurrentYearTotalRewards() public view returns (uint256) {
-        (uint256 year, uint256 percentage) = getCurrentVestingInfo();
+        uint256 year = getCurrentVestingYear();
         if (year >= 5) return 0;
-        return (totalMlpReward * percentage) / 100;
+        return (totalMlpReward * getCurrentVestingPercentage()) / 100;
     }
 
     function getTotalStakedNFTs() public view returns (uint256[5] memory) {
@@ -395,17 +397,18 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
 
     // Add helper function to get current daily cap
     function getCurrentDailyCap() public view returns (uint256) {
-        (uint256 year, uint256 percentage) = getCurrentVestingInfo();
+        uint256 year = getCurrentVestingYear();
         if (year >= 5) return 0;
 
         // Calculate daily cap based on current year's percentage
-        uint256 yearlyAmount = (totalMlpReward * percentage) / 100;
+        uint256 yearlyAmount = (totalMlpReward *
+            getCurrentVestingPercentage()) / 100;
         return yearlyAmount / YEAR_DURATION;
     }
 
     // Add helper function to get maximum claimable amount
     function getMaxClaimableAmount() public view returns (uint256) {
-        (uint256 currentYear, uint256 percentage) = getCurrentVestingInfo();
+        uint256 currentYear = getCurrentVestingYear();
         if (currentYear >= 5) return 0;
 
         uint256 totalAllowedClaims = 0;
@@ -418,7 +421,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         }
 
         // Add current year's claims up to current day
-        uint256 currentYearAmount = (totalMlpReward * percentage) / 100;
+        uint256 currentYearAmount = (totalMlpReward *
+            getCurrentVestingPercentage()) / 100;
         uint256 dailyCap = currentYearAmount / YEAR_DURATION;
         totalAllowedClaims += dailyCap * getCurrentDay();
 
@@ -433,7 +437,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
 
     // Add helper function to get current year's total claimed rewards
     function getCurrentYearClaimedRewards() public view returns (uint256) {
-        (uint256 year, ) = getCurrentVestingInfo();
+        uint256 year = getCurrentVestingYear();
         return yearlyClaimedRewards[year];
     }
 
