@@ -63,7 +63,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         address indexed user,
         uint256 amount,
         uint256 timestamp,
-        MintingType mintingType
+        MiningType miningType
     );
     event NFTContractSet(NFTType nftType, address contractAddress);
     event RewardPoolFunded(uint256 amount, uint256 timestamp);
@@ -324,12 +324,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             mlpToken.transfer(msg.sender, amount),
             "Reward transfer failed"
         );
-        emit RewardClaimed(
-            msg.sender,
-            amount,
-            block.timestamp,
-            MintingType.POW
-        );
+        emit RewardClaimed(msg.sender, amount, block.timestamp, MiningType.POW);
     }
 
     // Add function to set vesting start time (only owner)

@@ -9,7 +9,7 @@ enum NFTType {
     AiAgentUltra
 }
 
-enum MintingType {
+enum MiningType {
     Phone,
     POW,
     NFTBoosted,
