@@ -79,8 +79,15 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 timestamp
     );
 
-    // Add constant for minimum staking period (72 hours in seconds)
-    uint256 public constant MINIMUM_STAKING_PERIOD = 72 hours;
+    // Replace the constant with a variable
+    uint256 public MINIMUM_STAKING_PERIOD = 72 hours;
+
+    // Add enum for time units
+    enum TimeUnit {
+        Minutes,
+        Hours,
+        Days
+    }
 
     // Define StakeToken struct
     struct StakeToken {
@@ -464,5 +471,19 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         }
 
         return (nftTypes, tokenIds);
+    }
+
+    // Add function to set minimum staking period
+    function setMinimumStakingPeriod(
+        uint256 amount,
+        TimeUnit unit
+    ) external onlyOwner {
+        if (unit == TimeUnit.Minutes) {
+            MINIMUM_STAKING_PERIOD = amount * 1 minutes;
+        } else if (unit == TimeUnit.Hours) {
+            MINIMUM_STAKING_PERIOD = amount * 1 hours;
+        } else {
+            MINIMUM_STAKING_PERIOD = amount * 1 days;
+        }
     }
 }
