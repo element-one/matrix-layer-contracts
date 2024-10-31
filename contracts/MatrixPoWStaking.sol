@@ -7,6 +7,7 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
+import "./StakingTypes.sol";
 
 interface IMatrixNFT is IERC721 {
     function tokensOwned(
@@ -18,14 +19,6 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
     IERC20 public mlpToken;
-
-    enum NFTType {
-        Phone,
-        Matrix,
-        AiAgentOne,
-        AiAgentPro,
-        AiAgentUltra
-    }
 
     mapping(NFTType => IERC721) public nftContracts;
 
@@ -69,7 +62,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     event RewardClaimed(
         address indexed user,
         uint256 amount,
-        uint256 timestamp
+        uint256 timestamp,
+        MintingType mintingType
     );
     event NFTContractSet(NFTType nftType, address contractAddress);
     event RewardPoolFunded(uint256 amount, uint256 timestamp);
@@ -330,7 +324,12 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             mlpToken.transfer(msg.sender, amount),
             "Reward transfer failed"
         );
-        emit RewardClaimed(msg.sender, amount, block.timestamp);
+        emit RewardClaimed(
+            msg.sender,
+            amount,
+            block.timestamp,
+            MintingType.POW
+        );
     }
 
     // Add function to set vesting start time (only owner)
