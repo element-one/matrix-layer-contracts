@@ -316,6 +316,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 amount,
         bytes memory signature
     ) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+
         bytes32 structHash = keccak256(
             abi.encode(CLAIM_TYPEHASH, msg.sender, amount, nonces[msg.sender])
         );
