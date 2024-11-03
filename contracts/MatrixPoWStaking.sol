@@ -9,8 +9,6 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "./StakingTypes.sol";
 
-import "hardhat/console.sol";
-
 interface IMatrixNFT is IERC721 {
     function tokensOwned(
         address owner

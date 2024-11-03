@@ -22,7 +22,7 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
 
     IERC20 public mlpToken;
 
-    mapping(NFTType => IERC721) public nftContracts;
+    address public nftStaking;
 
     struct Stake {
         uint256 amount;
@@ -49,25 +49,12 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 amount,
         uint256 timestamp
     );
-    event NFTStaked(
-        address indexed user,
-        NFTType nftType,
-        uint256 tokenId,
-        uint256 timestamp
-    );
-    event NFTUnstaked(
-        address indexed user,
-        NFTType nftType,
-        uint256 tokenId,
-        uint256 timestamp
-    );
     event RewardClaimed(
         address indexed user,
         uint256 amount,
         uint256 timestamp,
         MiningType miningType
     );
-    event NFTContractSet(NFTType nftType, address contractAddress);
     event RewardPoolFunded(uint256 amount, uint256 timestamp);
     event EmergencyWithdraw(
         address indexed owner,
@@ -100,12 +87,24 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     uint256 public totalMlpReward;
     mapping(uint256 => uint256) public yearlyClaimedRewards; // year => claimed amount
 
-    // Add a mapping to track if Phone/Matrix NFTs have ever been staked
-    mapping(NFTType => mapping(uint256 => bool)) public hasBeenStaked;
-
     mapping(address => bool) public operators;
 
     bool public maxClaimableEnabled = true;
+
+    // Add new mappings for boosted stakes
+    mapping(address => uint256) public mlpStakes;
+
+    // Add new events
+    event MLPBoostedStaked(
+        address indexed user,
+        uint256 amount,
+        uint256 timestamp
+    );
+    event NFTBoostedStaked(
+        address indexed user,
+        uint256 tokenId,
+        uint256 timestamp
+    );
 
     modifier onlyOwnerOrOperator() {
         require(
@@ -118,17 +117,13 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     constructor(
         address _token,
         address _rewardSigner,
-        address[5] memory _nftContracts
+        address _staking
     ) Ownable(msg.sender) EIP712("MatrixStaking", "1") {
         mlpToken = IERC20(_token);
         rewardSigner = _rewardSigner;
         totalMlpReward = 1_250_000_000 * 10 ** 18; // 1.25B tokens with 18 decimals
         vestingStartTime = block.timestamp;
-
-        for (uint i = 0; i < 5; i++) {
-            nftContracts[NFTType(i)] = IERC721(_nftContracts[i]);
-            emit NFTContractSet(NFTType(i), _nftContracts[i]);
-        }
+        nftStaking = _staking;
     }
 
     function setRewardSigner(address _rewardSigner) external onlyOwner {
@@ -146,140 +141,6 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         );
         rewardPool += amount;
         emit RewardPoolFunded(amount, block.timestamp);
-    }
-
-    // Single NFT stake function
-    function stakeNFT(NFTType nftType, uint256 tokenId) external nonReentrant {
-        IERC721 nftContract = nftContracts[nftType];
-        require(address(nftContract) != address(0), "NFT type not supported");
-        require(
-            nftContract.ownerOf(tokenId) == msg.sender,
-            "Not the owner of the NFT"
-        );
-        require(
-            nftStakes[msg.sender][nftType][tokenId] == 0,
-            "NFT already staked"
-        );
-
-        // Check if Phone/Matrix NFTs have been staked before
-        if (nftType == NFTType.Phone || nftType == NFTType.Matrix) {
-            require(
-                !hasBeenStaked[nftType][tokenId],
-                "NFT has been staked before"
-            );
-            hasBeenStaked[nftType][tokenId] = true;
-        }
-
-        // Add approval check
-        require(
-            nftContract.isApprovedForAll(msg.sender, address(this)) ||
-                nftContract.getApproved(tokenId) == address(this),
-            "Contract not approved"
-        );
-
-        // Transfer NFT to staking contract
-        nftContract.transferFrom(msg.sender, address(this), tokenId);
-
-        uint256 timestamp = block.timestamp;
-        nftStakes[msg.sender][nftType][tokenId] = timestamp;
-        totalStakedNFTs[nftType]++;
-        userTotalStakedNFTs[msg.sender]++;
-
-        emit NFTStaked(msg.sender, nftType, tokenId, timestamp);
-    }
-
-    // Batch stake function
-    function stakeNFTs(StakeToken[] calldata _stakes) external nonReentrant {
-        require(_stakes.length > 0, "Empty stake array");
-        uint256 timestamp = block.timestamp;
-
-        for (uint256 i = 0; i < _stakes.length; i++) {
-            NFTType nftType = _stakes[i].nftType;
-            uint256[] memory tokenIds = _stakes[i].tokenIds;
-
-            require(tokenIds.length > 0, "Empty tokenIds array");
-            IERC721 nftContract = nftContracts[nftType];
-            require(
-                address(nftContract) != address(0),
-                "NFT type not supported"
-            );
-
-            // Add approval check for batch - can optimize if isApprovedForAll is true
-            bool isApprovedForAll = nftContract.isApprovedForAll(
-                msg.sender,
-                address(this)
-            );
-
-            for (uint256 j = 0; j < tokenIds.length; j++) {
-                uint256 tokenId = tokenIds[j];
-                require(
-                    nftContract.ownerOf(tokenId) == msg.sender,
-                    "Not the owner of the NFT"
-                );
-                require(
-                    nftStakes[msg.sender][nftType][tokenId] == 0,
-                    "NFT already staked"
-                );
-
-                // Check if Phone/Matrix NFTs have been staked before
-                if (nftType == NFTType.Phone || nftType == NFTType.Matrix) {
-                    require(
-                        !hasBeenStaked[nftType][tokenId],
-                        "NFT has been staked before"
-                    );
-                    hasBeenStaked[nftType][tokenId] = true;
-                }
-
-                // Check individual token approval only if not approved for all
-                if (!isApprovedForAll) {
-                    require(
-                        nftContract.getApproved(tokenId) == address(this),
-                        "Contract not approved"
-                    );
-                }
-
-                // Transfer NFT to staking contract
-                nftContract.transferFrom(msg.sender, address(this), tokenId);
-
-                nftStakes[msg.sender][nftType][tokenId] = timestamp;
-                totalStakedNFTs[nftType]++;
-                userTotalStakedNFTs[msg.sender]++;
-
-                emit NFTStaked(msg.sender, nftType, tokenId, timestamp);
-            }
-        }
-    }
-
-    function unstakeNFT(
-        NFTType nftType,
-        uint256 tokenId
-    ) external nonReentrant {
-        IERC721 nftContract = nftContracts[nftType];
-        require(address(nftContract) != address(0), "NFT type not supported");
-
-        uint256 stakeTimestamp = nftStakes[msg.sender][nftType][tokenId];
-        require(stakeTimestamp != 0, "NFT not staked");
-
-        require(
-            block.timestamp >= stakeTimestamp + MINIMUM_STAKING_PERIOD,
-            "Cannot unstake before 72 hours"
-        );
-
-        // Verify the NFT is owned by the contract
-        require(
-            nftContract.ownerOf(tokenId) == address(this),
-            "NFT not in staking contract"
-        );
-
-        uint256 timestamp = block.timestamp;
-
-        // Transfer NFT back to user
-        nftContract.transferFrom(address(this), msg.sender, tokenId);
-
-        totalStakedNFTs[nftType]--;
-        userTotalStakedNFTs[msg.sender]--;
-
-        emit NFTUnstaked(msg.sender, nftType, tokenId, timestamp);
     }
 
     // Add helper function to check remaining lock time
@@ -457,52 +318,6 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
             ((block.timestamp - vestingStartTime) % YEAR_DURATION) / 1 days + 1;
     }
 
-    // Get user's staked NFTs for a specific NFT type
-    function getUserStakedTokenIds(
-        address user,
-        NFTType nftType
-    ) external view returns (uint256[] memory) {
-        IERC721 nftContract = nftContracts[nftType];
-        require(address(nftContract) != address(0), "NFT type not supported");
-
-        IMatrixNFT matrixContract = IMatrixNFT(address(nftContract));
-        uint256[] memory allTokens = matrixContract.tokensOwned(address(this));
-        uint256[] memory userTokens = new uint256[](allTokens.length);
-        uint256 count = 0;
-
-        for (uint256 i = 0; i < allTokens.length; i++) {
-            if (nftStakes[user][nftType][allTokens[i]] > 0) {
-                userTokens[count++] = allTokens[i];
-            }
-        }
-
-        // Resize array to actual count
-        assembly {
-            mstore(userTokens, count)
-        }
-
-        return userTokens;
-    }
-
-    // Get all user's staked NFTs across all types
-    function getUserAllStakedNFTs(
-        address user
-    )
-        external
-        view
-        returns (NFTType[] memory nftTypes, uint256[][] memory tokenIds)
-    {
-        nftTypes = new NFTType[](5);
-        tokenIds = new uint256[][](5);
-
-        for (uint i = 0; i < 5; i++) {
-            nftTypes[i] = NFTType(i);
-            tokenIds[i] = this.getUserStakedTokenIds(user, NFTType(i));
-        }
-
-        return (nftTypes, tokenIds);
-    }
-
     // Add function to set minimum staking period
     function setMinimumStakingPeriod(
         uint256 amount,
@@ -519,5 +334,63 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
 
     function enableMaxClaimable() external onlyOwner {
         maxClaimableEnabled = !maxClaimableEnabled;
+    }
+
+    // Add new staking functions
+    function stakeMlpBoosted(uint256 amount) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(
+            mlpToken.transferFrom(msg.sender, address(this), amount),
+            "Transfer failed"
+        );
+
+        mlpStakes[msg.sender] += amount;
+        emit MLPBoostedStaked(msg.sender, amount, block.timestamp);
+    }
+
+    function stakeNFTBoosted(uint256 tokenId) external nonReentrant {
+        require(nftToken.ownerOf(tokenId) == msg.sender, "Not the owner");
+        require(tokenStaker[tokenId] == address(0), "NFT already staked");
+
+        nftToken.transferFrom(msg.sender, address(this), tokenId);
+
+        userTotalStakedNFTs[msg.sender]++;
+        tokenStaker[tokenId] = msg.sender;
+        userStakedNFTCount[msg.sender][tokenId]++;
+
+        emit NFTBoostedStaked(msg.sender, tokenId, block.timestamp);
+    }
+
+    // Add boost check functions
+    function hasNFTBoost(address user) public view returns (bool) {
+        return userTotalStakedNFTs[user] > 0;
+    }
+
+    function hasMLPBoost(address user) public view returns (bool) {
+        return mlpStakes[user] > 0;
+    }
+
+    // Add withdrawal functions
+    function withdrawMlpStake(uint256 amount) external nonReentrant {
+        require(mlpStakes[msg.sender] >= amount, "Insufficient staked amount");
+        mlpStakes[msg.sender] -= amount;
+        require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
+    }
+
+    function withdrawNFTStake(uint256 tokenId) external nonReentrant {
+        require(
+            tokenStaker[tokenId] == msg.sender,
+            "Not the staker of this NFT"
+        );
+        require(
+            userStakedNFTCount[msg.sender][tokenId] > 0,
+            "NFT not staked by user"
+        );
+
+        userTotalStakedNFTs[msg.sender]--;
+        tokenStaker[tokenId] = address(0);
+        userStakedNFTCount[msg.sender][tokenId]--;
+
+        nftToken.transferFrom(address(this), msg.sender, tokenId);
     }
 }
