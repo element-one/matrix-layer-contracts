@@ -9,36 +9,32 @@ import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import "./StakingTypes.sol";
 
-import "hardhat/console.sol";
-
-interface IMatrixNFT is IERC721 {
-    function tokensOwned(
-        address owner
-    ) external view returns (uint256[] memory);
+interface IMatrixPoWStaking {
+    function hasStakedNFTs(address user) external view returns (bool);
 }
 
 contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
     IERC20 public mlpToken;
-
-    address public nftStaking;
+    address public powContract;
 
     struct Stake {
         uint256 amount;
         uint256 timestamp;
+        uint256 lockPeriod;
     }
 
-    mapping(address => Stake) public tokenStakes;
-    mapping(address => mapping(NFTType => mapping(uint256 => uint256)))
-        public nftStakes; // user => NFTType => tokenId => stakeTimestamp
-    mapping(NFTType => uint256) public totalStakedNFTs; // Total staked NFTs for each type
-    mapping(address => uint256) public userTotalStakedNFTs; // Total staked NFTs for each user
+    mapping(address => mapping(MiningType => mapping(uint256 => Stake)))
+        public stakes;
+    mapping(address => mapping(MiningType => uint256)) public stakeCount;
+    mapping(uint256 => uint256) public yearlyClaimedNFTRewards; // year => claimed amount
+    mapping(uint256 => uint256) public yearlyClaimedMLPRewards; // year => claimed amount
+    mapping(address => uint256) public nonces;
+    mapping(address => bool) public operators;
 
     uint256 public rewardPool;
-
     address public rewardSigner;
-    mapping(address => uint256) public nonces;
 
     bytes32 private constant CLAIM_TYPEHASH =
         keccak256("Claim(address user,uint256 amount,uint256 nonce)");
@@ -60,6 +56,14 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         address indexed owner,
         uint256 amount,
         uint256 timestamp
+    );
+    event StakeCreated(
+        address indexed user,
+        uint256 amount,
+        uint256 timestamp,
+        uint256 stakeId,
+        uint256 lockPeriod,
+        MiningType miningType
     );
 
     // Replace the constant with a variable
@@ -85,14 +89,8 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     // Add vesting variables
     uint256 public vestingStartTime;
     uint256 public totalMlpReward;
-    mapping(uint256 => uint256) public yearlyClaimedRewards; // year => claimed amount
-
-    mapping(address => bool) public operators;
 
     bool public maxClaimableEnabled = true;
-
-    // Add new mappings for boosted stakes
-    mapping(address => uint256) public mlpStakes;
 
     // Add new events
     event MLPBoostedStaked(
@@ -106,6 +104,16 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 timestamp
     );
 
+    // Add constants for pool distributions
+    uint256 public constant NFT_BOOST_PERCENTAGE = 50;
+    uint256 public constant MLP_BOOST_PERCENTAGE = 50;
+
+    // Add staking period constants
+    uint256 public constant THIRTY_DAYS = 30 days;
+    uint256 public constant SIXTY_DAYS = 60 days;
+    uint256 public constant NINETY_DAYS = 90 days;
+    uint256 public constant ONE_EIGHTY_DAYS = 180 days;
+
     modifier onlyOwnerOrOperator() {
         require(
             msg.sender == owner() || operators[msg.sender],
@@ -117,13 +125,13 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     constructor(
         address _token,
         address _rewardSigner,
-        address _staking
+        address _powContract
     ) Ownable(msg.sender) EIP712("MatrixStaking", "1") {
         mlpToken = IERC20(_token);
         rewardSigner = _rewardSigner;
         totalMlpReward = 1_250_000_000 * 10 ** 18; // 1.25B tokens with 18 decimals
         vestingStartTime = block.timestamp;
-        nftStaking = _staking;
+        powContract = _powContract;
     }
 
     function setRewardSigner(address _rewardSigner) external onlyOwner {
@@ -141,21 +149,6 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         );
         rewardPool += amount;
         emit RewardPoolFunded(amount, block.timestamp);
-    }
-
-    // Add helper function to check remaining lock time
-    function getRemainingLockTime(
-        NFTType nftType,
-        uint256 tokenId,
-        address user
-    ) external view returns (uint256) {
-        uint256 stakeTimestamp = nftStakes[user][nftType][tokenId];
-        if (stakeTimestamp == 0) return 0;
-
-        uint256 unlockTime = stakeTimestamp + MINIMUM_STAKING_PERIOD;
-        if (block.timestamp >= unlockTime) return 0;
-
-        return unlockTime - block.timestamp;
     }
 
     // Get current vesting year (0-5)
@@ -196,23 +189,31 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 year = getCurrentVestingYear();
         require(year < 5, "Vesting period ended");
 
+        MiningType miningType;
+        if (hasNFTBoost(msg.sender)) {
+            miningType = MiningType.NFTBoosted;
+            yearlyClaimedNFTRewards[year] += amount;
+        } else if (hasMLPBoost(msg.sender)) {
+            miningType = MiningType.MLPBoosted;
+            yearlyClaimedMLPRewards[year] += amount;
+        } else {
+            revert("No active boost");
+        }
+
         // Only check maxClaimable if enabled
         if (maxClaimableEnabled) {
-            uint256 maxClaimable = getMaxClaimableAmount();
-            console.log("maxClaimable", maxClaimable);
-            console.log("amount", amount);
+            uint256 maxClaimable = getMaxClaimableAmount(miningType);
             require(amount <= maxClaimable, "Amount exceeds maximum claimable");
         }
 
         require(rewardPool >= amount, "Insufficient reward pool balance");
         rewardPool -= amount;
-        yearlyClaimedRewards[year] += amount;
 
         require(
             mlpToken.transfer(msg.sender, amount),
             "Reward transfer failed"
         );
-        emit RewardClaimed(msg.sender, amount, block.timestamp, MiningType.POW);
+        emit RewardClaimed(msg.sender, amount, block.timestamp, miningType);
     }
 
     // Add function to set vesting start time (only owner)
@@ -226,18 +227,6 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 year = getCurrentVestingYear();
         if (year >= 5) return 0;
         return (totalMlpReward * getCurrentVestingPercentage()) / 100;
-    }
-
-    function getTotalStakedNFTs() public view returns (uint256[5] memory) {
-        uint256[5] memory result;
-        for (uint i = 0; i < 5; i++) {
-            result[i] = totalStakedNFTs[NFTType(i)];
-        }
-        return result;
-    }
-
-    function getUserStakedNFTs(address user) public view returns (uint256) {
-        return userTotalStakedNFTs[user];
     }
 
     // Emergency withdrawal function for MLP tokens
@@ -272,45 +261,59 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     }
 
     // Add helper function to get maximum claimable amount
-    function getMaxClaimableAmount() public view returns (uint256) {
+    function getMaxClaimableAmount(
+        MiningType miningType
+    ) public view returns (uint256) {
         uint256 currentYear = getCurrentVestingYear();
         if (currentYear >= 5) return 0;
+
+        uint256 poolPercentage;
+        if (miningType == MiningType.NFTBoosted) {
+            poolPercentage = NFT_BOOST_PERCENTAGE;
+        } else {
+            poolPercentage = MLP_BOOST_PERCENTAGE;
+        }
 
         uint256 totalAllowedClaims = 0;
 
         // Add up completed years
         for (uint256 year = 0; year < currentYear; year++) {
             totalAllowedClaims +=
-                (totalMlpReward * VESTING_PERCENTAGES[year]) /
-                100;
+                (totalMlpReward * VESTING_PERCENTAGES[year] * poolPercentage) /
+                10000;
         }
-        console.log("totalAllowedClaims", totalAllowedClaims);
 
         // Add current year's claims up to current day
         uint256 currentYearAmount = (totalMlpReward *
-            getCurrentVestingPercentage()) / 100;
-        console.log("currentYearAmount", currentYearAmount);
+            getCurrentVestingPercentage() *
+            poolPercentage) / 10000;
         uint256 dailyCap = currentYearAmount / YEAR_DURATION;
-        console.log("dailyCap", dailyCap);
         totalAllowedClaims += dailyCap * getCurrentDay();
-        console.log("totalAllowedClaims", totalAllowedClaims);
+
+        // Check claimed rewards for specific pool
         uint256 totalClaimedAllYears = 0;
+
         for (uint256 year = 0; year <= currentYear; year++) {
-            totalClaimedAllYears += yearlyClaimedRewards[year];
+            if (miningType == MiningType.NFTBoosted) {
+                totalClaimedAllYears += yearlyClaimedNFTRewards[year];
+            } else {
+                totalClaimedAllYears += yearlyClaimedMLPRewards[year];
+            }
         }
-        console.log("totalClaimedAllYears", totalClaimedAllYears);
+
         if (totalClaimedAllYears >= totalAllowedClaims) return 0;
-        console.log(
-            "totalAllowedClaims - totalClaimedAllYears",
-            totalAllowedClaims - totalClaimedAllYears
-        );
         return totalAllowedClaims - totalClaimedAllYears;
     }
 
     // Add helper function to get current year's total claimed rewards
-    function getCurrentYearClaimedRewards() public view returns (uint256) {
+    function getCurrentYearClaimedRewards(
+        MiningType miningType
+    ) public view returns (uint256) {
         uint256 year = getCurrentVestingYear();
-        return yearlyClaimedRewards[year];
+        return
+            miningType == MiningType.NFTBoosted
+                ? yearlyClaimedNFTRewards[year]
+                : yearlyClaimedMLPRewards[year];
     }
 
     function getCurrentDay() public view returns (uint256) {
@@ -337,60 +340,202 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     }
 
     // Add new staking functions
-    function stakeMlpBoosted(uint256 amount) external nonReentrant {
+    function stakeMlpBoosted(
+        uint256 amount,
+        uint256 stakingPeriod
+    ) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
+        require(
+            stakingPeriod == THIRTY_DAYS ||
+                stakingPeriod == SIXTY_DAYS ||
+                stakingPeriod == NINETY_DAYS ||
+                stakingPeriod == ONE_EIGHTY_DAYS,
+            "Invalid staking period"
+        );
         require(
             mlpToken.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
         );
 
-        mlpStakes[msg.sender] += amount;
-        emit MLPBoostedStaked(msg.sender, amount, block.timestamp);
+        uint256 stakeId = stakeCount[msg.sender][MiningType.MLPBoosted]++;
+        stakes[msg.sender][MiningType.MLPBoosted][stakeId] = Stake({
+            amount: amount,
+            timestamp: block.timestamp,
+            lockPeriod: stakingPeriod
+        });
+        emit StakeCreated(
+            msg.sender,
+            amount,
+            block.timestamp,
+            stakeId,
+            stakingPeriod,
+            MiningType.MLPBoosted
+        );
     }
 
-    function stakeNFTBoosted(uint256 tokenId) external nonReentrant {
-        require(nftToken.ownerOf(tokenId) == msg.sender, "Not the owner");
-        require(tokenStaker[tokenId] == address(0), "NFT already staked");
+    function stakeNFTBoosted(
+        uint256 amount,
+        uint256 stakingPeriod
+    ) external nonReentrant {
+        require(amount > 0, "Amount must be greater than 0");
+        require(
+            stakingPeriod == THIRTY_DAYS ||
+                stakingPeriod == SIXTY_DAYS ||
+                stakingPeriod == NINETY_DAYS ||
+                stakingPeriod == ONE_EIGHTY_DAYS,
+            "Invalid staking period"
+        );
 
-        nftToken.transferFrom(msg.sender, address(this), tokenId);
+        IMatrixPoWStaking pow = IMatrixPoWStaking(powContract);
+        require(pow.hasStakedNFTs(msg.sender), "Must have valid staked NFTs");
 
-        userTotalStakedNFTs[msg.sender]++;
-        tokenStaker[tokenId] = msg.sender;
-        userStakedNFTCount[msg.sender][tokenId]++;
+        require(
+            mlpToken.transferFrom(msg.sender, address(this), amount),
+            "Transfer failed"
+        );
 
-        emit NFTBoostedStaked(msg.sender, tokenId, block.timestamp);
+        uint256 stakeId = stakeCount[msg.sender][MiningType.NFTBoosted]++;
+        stakes[msg.sender][MiningType.NFTBoosted][stakeId] = Stake({
+            amount: amount,
+            timestamp: block.timestamp,
+            lockPeriod: stakingPeriod
+        });
+        emit StakeCreated(
+            msg.sender,
+            amount,
+            block.timestamp,
+            stakeId,
+            stakingPeriod,
+            MiningType.NFTBoosted
+        );
     }
 
     // Add boost check functions
     function hasNFTBoost(address user) public view returns (bool) {
-        return userTotalStakedNFTs[user] > 0;
+        uint256 total = getTotalStaked(user, MiningType.NFTBoosted);
+        return total > 0;
     }
 
     function hasMLPBoost(address user) public view returns (bool) {
-        return mlpStakes[user] > 0;
+        uint256 total = getTotalStaked(user, MiningType.MLPBoosted);
+        return total > 0;
     }
 
-    // Add withdrawal functions
-    function withdrawMlpStake(uint256 amount) external nonReentrant {
-        require(mlpStakes[msg.sender] >= amount, "Insufficient staked amount");
-        mlpStakes[msg.sender] -= amount;
+    function unstakeNFTBoosted(
+        uint256 stakeId,
+        MiningType miningType
+    ) external nonReentrant {
+        Stake storage stake = stakes[msg.sender][miningType][stakeId];
+        require(stake.amount > 0, "No stake found");
+        require(
+            block.timestamp >= stake.timestamp + stake.lockPeriod,
+            "Lock period not ended"
+        );
+
+        uint256 amount = stake.amount;
+        delete stakes[msg.sender][miningType][stakeId];
+
         require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
+        emit TokenUnstaked(msg.sender, amount, block.timestamp);
     }
 
-    function withdrawNFTStake(uint256 tokenId) external nonReentrant {
+    function unstakeMLPBoosted(
+        uint256 stakeId,
+        MiningType miningType
+    ) external nonReentrant {
+        Stake storage stake = stakes[msg.sender][miningType][stakeId];
+        require(stake.amount > 0, "No stake found");
         require(
-            tokenStaker[tokenId] == msg.sender,
-            "Not the staker of this NFT"
-        );
-        require(
-            userStakedNFTCount[msg.sender][tokenId] > 0,
-            "NFT not staked by user"
+            block.timestamp >= stake.timestamp + stake.lockPeriod,
+            "Lock period not ended"
         );
 
-        userTotalStakedNFTs[msg.sender]--;
-        tokenStaker[tokenId] = address(0);
-        userStakedNFTCount[msg.sender][tokenId]--;
+        uint256 amount = stake.amount;
+        delete stakes[msg.sender][miningType][stakeId];
 
-        nftToken.transferFrom(address(this), msg.sender, tokenId);
+        require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
+        emit TokenUnstaked(msg.sender, amount, block.timestamp);
+    }
+
+    // Add helper to get total staked amount for a user and mining type
+    function getTotalStaked(
+        address user,
+        MiningType miningType
+    ) public view returns (uint256) {
+        uint256 total = 0;
+        uint256 count = stakeCount[user][miningType];
+        for (uint256 i = 0; i < count; i++) {
+            total += stakes[user][miningType][i].amount;
+        }
+        return total;
+    }
+
+    function getUserStakes(
+        address user,
+        MiningType miningType
+    )
+        external
+        view
+        returns (
+            uint256[] memory stakeIds,
+            uint256[] memory amounts,
+            uint256[] memory timestamps,
+            uint256[] memory lockPeriods,
+            bool[] memory isUnlocked
+        )
+    {
+        uint256 count = stakeCount[user][miningType];
+        stakeIds = new uint256[](count);
+        amounts = new uint256[](count);
+        timestamps = new uint256[](count);
+        lockPeriods = new uint256[](count);
+        isUnlocked = new bool[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            Stake storage stake = stakes[user][miningType][i];
+            if (stake.amount > 0) {
+                stakeIds[i] = i;
+                amounts[i] = stake.amount;
+                timestamps[i] = stake.timestamp;
+                lockPeriods[i] = stake.lockPeriod;
+                isUnlocked[i] =
+                    block.timestamp >= stake.timestamp + stake.lockPeriod;
+            }
+        }
+
+        return (stakeIds, amounts, timestamps, lockPeriods, isUnlocked);
+    }
+
+    function getStakingDetail(
+        address user,
+        uint256 stakeId,
+        MiningType miningType
+    )
+        external
+        view
+        returns (
+            uint256 amount,
+            uint256 timestamp,
+            uint256 lockPeriod,
+            uint256 remainingTime,
+            bool isUnlocked
+        )
+    {
+        Stake storage stake = stakes[user][miningType][stakeId];
+        require(stake.amount > 0, "No stake found");
+
+        uint256 endTime = stake.timestamp + stake.lockPeriod;
+        remainingTime = block.timestamp >= endTime
+            ? 0
+            : endTime - block.timestamp;
+        isUnlocked = block.timestamp >= endTime;
+
+        return (
+            stake.amount,
+            stake.timestamp,
+            stake.lockPeriod,
+            remainingTime,
+            isUnlocked
+        );
     }
 }

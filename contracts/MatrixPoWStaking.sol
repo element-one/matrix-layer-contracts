@@ -27,7 +27,6 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 timestamp;
     }
 
-    mapping(address => Stake) public tokenStakes;
     mapping(address => mapping(NFTType => mapping(uint256 => uint256)))
         public nftStakes; // user => NFTType => tokenId => stakeTimestamp
     mapping(NFTType => uint256) public totalStakedNFTs; // Total staked NFTs for each type
@@ -483,6 +482,50 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         }
 
         return (nftTypes, tokenIds);
+    }
+
+    function hasStakedNFTs(address user) public view returns (bool) {
+        // Check Phone NFTs (10 day expiration)
+        uint256[] memory phoneTokens = this.getUserStakedTokenIds(
+            user,
+            NFTType.Phone
+        );
+        for (uint i = 0; i < phoneTokens.length; i++) {
+            uint256 stakeTime = nftStakes[user][NFTType.Phone][phoneTokens[i]];
+            if (block.timestamp <= stakeTime + 10 days) {
+                return true;
+            }
+        }
+
+        // Check Matrix NFTs (7 day expiration)
+        uint256[] memory matrixTokens = this.getUserStakedTokenIds(
+            user,
+            NFTType.Matrix
+        );
+        for (uint i = 0; i < matrixTokens.length; i++) {
+            uint256 stakeTime = nftStakes[user][NFTType.Matrix][
+                matrixTokens[i]
+            ];
+            if (block.timestamp <= stakeTime + 7 days) {
+                return true;
+            }
+        }
+
+        // Check other NFT types (no expiration)
+        for (uint i = 0; i < 5; i++) {
+            NFTType nftType = NFTType(i);
+            if (nftType != NFTType.Phone && nftType != NFTType.Matrix) {
+                uint256[] memory tokens = this.getUserStakedTokenIds(
+                    user,
+                    nftType
+                );
+                if (tokens.length > 0) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     // Add function to set minimum staking period
