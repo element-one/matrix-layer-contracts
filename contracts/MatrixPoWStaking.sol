@@ -41,12 +41,6 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     bytes32 private constant CLAIM_TYPEHASH =
         keccak256("Claim(address user,uint256 amount,uint256 nonce)");
 
-    event TokenStaked(address indexed user, uint256 amount, uint256 timestamp);
-    event TokenUnstaked(
-        address indexed user,
-        uint256 amount,
-        uint256 timestamp
-    );
     event NFTStaked(
         address indexed user,
         NFTType nftType,
