@@ -17,7 +17,7 @@ interface IMatrixNFT is IERC721 {
     ) external view returns (uint256[] memory);
 }
 
-contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
+contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
     IERC20 public mlpToken;
@@ -93,7 +93,6 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
 
     // Add vesting schedule constants
     uint256 public constant YEAR_DURATION = 365 days;
-    uint256 public constant YEAR_COUNT = 365;
     uint256[5] public VESTING_PERCENTAGES = [40, 30, 15, 10, 5]; // in percentage points
 
     // Add vesting variables
@@ -123,7 +122,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     ) Ownable(msg.sender) EIP712("MatrixStaking", "1") {
         mlpToken = IERC20(_token);
         rewardSigner = _rewardSigner;
-        totalMlpReward = 1_250_000_000 * 10 ** 18;
+        totalMlpReward = 1_250_000_000 * 10 ** 18; // 1.25B tokens with 18 decimals
         vestingStartTime = block.timestamp;
 
         for (uint i = 0; i < 5; i++) {
@@ -339,6 +338,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         // Only check maxClaimable if enabled
         if (maxClaimableEnabled) {
             uint256 maxClaimable = getMaxClaimableAmount();
+            console.log("maxClaimable", maxClaimable);
+            console.log("amount", amount);
             require(amount <= maxClaimable, "Amount exceeds maximum claimable");
         }
 
@@ -406,7 +407,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         // Calculate daily cap based on current year's percentage
         uint256 yearlyAmount = (totalMlpReward *
             getCurrentVestingPercentage()) / 100;
-        return yearlyAmount / YEAR_COUNT;
+        return yearlyAmount / YEAR_DURATION;
     }
 
     // Add helper function to get maximum claimable amount
@@ -422,17 +423,26 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
                 (totalMlpReward * VESTING_PERCENTAGES[year]) /
                 100;
         }
+        console.log("totalAllowedClaims", totalAllowedClaims);
 
         // Add current year's claims up to current day
         uint256 currentYearAmount = (totalMlpReward *
             getCurrentVestingPercentage()) / 100;
-        uint256 dailyCap = currentYearAmount / YEAR_COUNT;
+        console.log("currentYearAmount", currentYearAmount);
+        uint256 dailyCap = currentYearAmount / YEAR_DURATION;
+        console.log("dailyCap", dailyCap);
         totalAllowedClaims += dailyCap * getCurrentDay();
+        console.log("totalAllowedClaims", totalAllowedClaims);
         uint256 totalClaimedAllYears = 0;
         for (uint256 year = 0; year <= currentYear; year++) {
             totalClaimedAllYears += yearlyClaimedRewards[year];
         }
+        console.log("totalClaimedAllYears", totalClaimedAllYears);
         if (totalClaimedAllYears >= totalAllowedClaims) return 0;
+        console.log(
+            "totalAllowedClaims - totalClaimedAllYears",
+            totalAllowedClaims - totalClaimedAllYears
+        );
         return totalAllowedClaims - totalClaimedAllYears;
     }
 
