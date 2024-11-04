@@ -25,10 +25,11 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     struct Stake {
         uint256 amount;
         uint256 timestamp;
+        uint256 lockPeriod;
     }
 
-    mapping(address => mapping(NFTType => mapping(uint256 => uint256)))
-        public nftStakes; // user => NFTType => tokenId => stakeTimestamp
+    mapping(address => mapping(NFTType => mapping(uint256 => Stake)))
+        public nftStakes; // user => NFTType => tokenId => Stake
     mapping(NFTType => uint256) public totalStakedNFTs; // Total staked NFTs for each type
     mapping(address => uint256) public userTotalStakedNFTs; // Total staked NFTs for each user
 
@@ -149,7 +150,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             "Not the owner of the NFT"
         );
         require(
-            nftStakes[msg.sender][nftType][tokenId] == 0,
+            nftStakes[msg.sender][nftType][tokenId].timestamp == 0,
             "NFT already staked"
         );
 
@@ -172,12 +173,16 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         // Transfer NFT to staking contract
         nftContract.transferFrom(msg.sender, address(this), tokenId);
 
-        uint256 timestamp = block.timestamp;
-        nftStakes[msg.sender][nftType][tokenId] = timestamp;
+        nftStakes[msg.sender][nftType][tokenId] = Stake({
+            timestamp: block.timestamp,
+            amount: 1,
+            lockPeriod: MINIMUM_STAKING_PERIOD
+        });
+
         totalStakedNFTs[nftType]++;
         userTotalStakedNFTs[msg.sender]++;
 
-        emit NFTStaked(msg.sender, nftType, tokenId, timestamp);
+        emit NFTStaked(msg.sender, nftType, tokenId, block.timestamp);
     }
 
     // Batch stake function
@@ -209,7 +214,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
                     "Not the owner of the NFT"
                 );
                 require(
-                    nftStakes[msg.sender][nftType][tokenId] == 0,
+                    nftStakes[msg.sender][nftType][tokenId].timestamp == 0,
                     "NFT already staked"
                 );
 
@@ -233,7 +238,12 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
                 // Transfer NFT to staking contract
                 nftContract.transferFrom(msg.sender, address(this), tokenId);
 
-                nftStakes[msg.sender][nftType][tokenId] = timestamp;
+                nftStakes[msg.sender][nftType][tokenId] = Stake({
+                    timestamp: timestamp,
+                    amount: 1,
+                    lockPeriod: MINIMUM_STAKING_PERIOD
+                });
+
                 totalStakedNFTs[nftType]++;
                 userTotalStakedNFTs[msg.sender]++;
 
@@ -249,29 +259,28 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         IERC721 nftContract = nftContracts[nftType];
         require(address(nftContract) != address(0), "NFT type not supported");
 
-        uint256 stakeTimestamp = nftStakes[msg.sender][nftType][tokenId];
-        require(stakeTimestamp != 0, "NFT not staked");
-
+        Stake storage stake = nftStakes[msg.sender][nftType][tokenId];
+        require(stake.timestamp != 0, "NFT not staked");
         require(
-            block.timestamp >= stakeTimestamp + MINIMUM_STAKING_PERIOD,
-            "Cannot unstake before 72 hours"
+            block.timestamp >= stake.timestamp + stake.lockPeriod,
+            "Cannot unstake before minimum period"
         );
 
-        // Verify the NFT is owned by the contract
         require(
             nftContract.ownerOf(tokenId) == address(this),
             "NFT not in staking contract"
         );
 
-        uint256 timestamp = block.timestamp;
-
         // Transfer NFT back to user
         nftContract.transferFrom(address(this), msg.sender, tokenId);
+
+        // Delete the stake
+        delete nftStakes[msg.sender][nftType][tokenId];
 
         totalStakedNFTs[nftType]--;
         userTotalStakedNFTs[msg.sender]--;
 
-        emit NFTUnstaked(msg.sender, nftType, tokenId, timestamp);
+        emit NFTUnstaked(msg.sender, nftType, tokenId, block.timestamp);
     }
 
     // Add helper function to check remaining lock time
@@ -280,10 +289,10 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 tokenId,
         address user
     ) external view returns (uint256) {
-        uint256 stakeTimestamp = nftStakes[user][nftType][tokenId];
-        if (stakeTimestamp == 0) return 0;
+        Stake storage stake = nftStakes[user][nftType][tokenId];
+        if (stake.timestamp == 0) return 0;
 
-        uint256 unlockTime = stakeTimestamp + MINIMUM_STAKING_PERIOD;
+        uint256 unlockTime = stake.timestamp + stake.lockPeriod;
         if (block.timestamp >= unlockTime) return 0;
 
         return unlockTime - block.timestamp;
@@ -452,7 +461,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 count = 0;
 
         for (uint256 i = 0; i < allTokens.length; i++) {
-            if (nftStakes[user][nftType][allTokens[i]] > 0) {
+            if (nftStakes[user][nftType][allTokens[i]].timestamp > 0) {
                 userTokens[count++] = allTokens[i];
             }
         }
@@ -491,7 +500,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             NFTType.Phone
         );
         for (uint i = 0; i < phoneTokens.length; i++) {
-            uint256 stakeTime = nftStakes[user][NFTType.Phone][phoneTokens[i]];
+            uint256 stakeTime = nftStakes[user][NFTType.Phone][phoneTokens[i]]
+                .timestamp;
             if (block.timestamp <= stakeTime + 10 days) {
                 return true;
             }
@@ -503,9 +513,8 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             NFTType.Matrix
         );
         for (uint i = 0; i < matrixTokens.length; i++) {
-            uint256 stakeTime = nftStakes[user][NFTType.Matrix][
-                matrixTokens[i]
-            ];
+            uint256 stakeTime = nftStakes[user][NFTType.Matrix][matrixTokens[i]]
+                .timestamp;
             if (block.timestamp <= stakeTime + 7 days) {
                 return true;
             }
