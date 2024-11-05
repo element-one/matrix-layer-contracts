@@ -19,6 +19,7 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     using ECDSA for bytes32;
 
     IERC20 public mlpToken;
+    address public accountingAddress;
 
     mapping(NFTType => IERC721) public nftContracts;
 
@@ -111,16 +112,30 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
     constructor(
         address _token,
         address _rewardSigner,
+        address _accountingAddress,
         address[5] memory _nftContracts
     ) Ownable(msg.sender) EIP712("MatrixStaking", "1") {
         mlpToken = IERC20(_token);
         rewardSigner = _rewardSigner;
         totalMlpReward = 1_250_000_000 * 10 ** 18;
         vestingStartTime = block.timestamp;
+        accountingAddress = _accountingAddress;
 
         for (uint i = 0; i < 5; i++) {
             nftContracts[NFTType(i)] = IERC721(_nftContracts[i]);
             emit NFTContractSet(NFTType(i), _nftContracts[i]);
+        }
+    }
+
+    function setNftContractAddresses(
+        address[] calldata nftAddresses
+    ) external onlyOwner {
+        require(
+            nftAddresses.length == 5,
+            "Must provide 5 NFT contract addresses"
+        );
+        for (uint256 i = 0; i < nftAddresses.length; i++) {
+            nftContracts[NFTType(i)] = IERC721(nftAddresses[i]);
         }
     }
 
@@ -386,7 +401,10 @@ contract MatrixPoWStaking is ReentrancyGuard, Ownable, EIP712 {
             "Insufficient balance"
         );
 
-        require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
+        require(
+            mlpToken.transfer(accountingAddress, amount),
+            "Transfer failed"
+        );
 
         // Update reward pool balance
         if (amount <= rewardPool) {

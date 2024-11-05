@@ -373,18 +373,8 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         );
     }
 
-    function stakeNFTBoosted(
-        uint256 amount,
-        uint256 stakingPeriod
-    ) external nonReentrant {
+    function stakeNFTBoosted(uint256 amount) external nonReentrant {
         require(amount > 0, "Amount must be greater than 0");
-        require(
-            stakingPeriod == THIRTY_DAYS ||
-                stakingPeriod == SIXTY_DAYS ||
-                stakingPeriod == NINETY_DAYS ||
-                stakingPeriod == ONE_EIGHTY_DAYS,
-            "Invalid staking period"
-        );
 
         IMatrixPoWStaking pow = IMatrixPoWStaking(powContract);
         require(pow.hasStakedNFTs(msg.sender), "Must have valid staked NFTs");
@@ -398,14 +388,14 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         stakes[msg.sender][MiningType.NFTBoosted][stakeId] = Stake({
             amount: amount,
             timestamp: block.timestamp,
-            lockPeriod: stakingPeriod
+            lockPeriod: 0 // No lock period for NFT boosted stakes
         });
         emit StakeCreated(
             msg.sender,
             amount,
             block.timestamp,
             stakeId,
-            stakingPeriod,
+            0, // Lock period is 0
             MiningType.NFTBoosted
         );
     }
