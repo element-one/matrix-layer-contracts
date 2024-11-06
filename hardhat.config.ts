@@ -23,12 +23,12 @@ const config: HardhatUserConfig = {
       accounts: [process.env.TESTNET_PRIVATE_KEY as string],
       gasPrice: 20000000000,
     },
-    bscMainnet: {
-      url: process.env.MAINNET_BSC_URL,
-      chainId: 56,
-      accounts: [process.env.MAINNET_PRIVATE_KEY as string],
-      gasPrice: 20000000000,
-    },
+    // bscMainnet: {
+    //   url: process.env.MAINNET_BSC_URL,
+    //   chainId: 56,
+    //   accounts: [process.env.MAINNET_PRIVATE_KEY as string],
+    //   gasPrice: 20000000000,
+    // },
   },
   sourcify: {
     enabled: true,
