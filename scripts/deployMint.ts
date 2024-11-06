@@ -5,38 +5,40 @@ async function main() {
     const [deployer] = await ethers.getSigners();
     console.log('Deploying MatrixMint with account:', deployer.address);
 
-    // const MatrixMint = await ethers.getContractFactory('MatrixMint');
-    // console.log('Contract factory created');
+    const MatrixMint = await ethers.getContractFactory('MatrixMint');
+    console.log('Contract factory created');
 
-    // console.log('Deploying proxy...');
-    // const matrixMint = await upgrades.deployProxy(
-    //   MatrixMint,
-    //   [
-    //     'MatrixMint', // name
-    //     'MTX', // symbol
-    //     deployer.address, // initialOwner
-    //   ],
-    //   {
-    //     initializer: 'initialize',
-    //     txOverrides: { gasLimit: 5000000 },
-    //   }
-    // );
+    console.log('Deploying proxy...');
+    const matrixMint = await upgrades.deployProxy(
+      MatrixMint,
+      [
+        'MatrixMint', // name
+        'MTX', // symbol
+        deployer.address, // initialOwner
+      ],
+      {
+        initializer: 'initialize',
+        txOverrides: { gasLimit: 6000000 },
+      }
+    );
 
-    // console.log('Waiting for deployment...');
-    // await matrixMint.waitForDeployment();
+    console.log('Waiting for deployment...');
+    await matrixMint.waitForDeployment();
 
-    // const matrixMintAddress = await matrixMint.getAddress();
-    // console.log('MatrixMint deployed to:', matrixMintAddress);
+    const matrixMintAddress = await matrixMint.getAddress();
+    console.log('MatrixMint deployed to:', matrixMintAddress);
 
-    // console.log('Getting implementation address...');
-    // const implementationAddress =
-    //   await upgrades.erc1967.getImplementationAddress(matrixMintAddress);
-    // console.log('Implementation contract address:', implementationAddress);
+    console.log('Getting implementation address...');
+    const implementationAddress =
+      await upgrades.erc1967.getImplementationAddress(matrixMintAddress);
+    console.log('Implementation contract address:', implementationAddress);
 
     console.log('Verifying implementation contract on Etherscan...');
     try {
-      await run('verify:verify', {
-        address: '0x018A02Bb36dE21e5644342bd26d8c31a5631326e',
+      await hre.run('verify:verify', {
+        address: implementationAddress,
+        contract: `contracts/MatrixMint.sol:MatrixMint`,
+        constructorArguments: ['MatrixMint', 'MTX', deployer.address],
       });
       console.log('Implementation contract verified successfully');
     } catch (error) {

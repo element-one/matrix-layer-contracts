@@ -18,6 +18,7 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
 
     IERC20 public mlpToken;
     address public powContract;
+    address public accountingAddress;
 
     struct Stake {
         uint256 amount;
@@ -114,6 +115,15 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     uint256 public constant NINETY_DAYS = 90 days;
     uint256 public constant ONE_EIGHTY_DAYS = 180 days;
 
+    // Add the enum at contract level
+    enum StakingType {
+        FreeWithdraw,
+        FullLocked
+    }
+
+    // Add state variable for minimum stake amount
+    uint256 public minimumStakeAmount = 100 * 10 ** 18; // 100 MLP tokens
+
     modifier onlyOwnerOrOperator() {
         require(
             msg.sender == owner() || operators[msg.sender],
@@ -125,13 +135,15 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     constructor(
         address _token,
         address _rewardSigner,
-        address _powContract
+        address _powContract,
+        address _accountingAddress
     ) Ownable(msg.sender) EIP712("MatrixStaking", "1") {
         mlpToken = IERC20(_token);
         rewardSigner = _rewardSigner;
         totalMlpReward = 1_250_000_000 * 10 ** 18; // 1.25B tokens with 18 decimals
         vestingStartTime = block.timestamp;
         powContract = _powContract;
+        accountingAddress = _accountingAddress;
     }
 
     function setRewardSigner(address _rewardSigner) external onlyOwner {
@@ -237,7 +249,10 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
             "Insufficient balance"
         );
 
-        require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
+        require(
+            mlpToken.transfer(accountingAddress, amount),
+            "Transfer failed"
+        );
 
         // Update reward pool balance
         if (amount <= rewardPool) {
@@ -339,11 +354,18 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         maxClaimableEnabled = !maxClaimableEnabled;
     }
 
-    // Add new staking functions
+    // Add setter function for owner
+    function setMinimumStakeAmount(uint256 _amount) external onlyOwner {
+        minimumStakeAmount = _amount;
+    }
+
+    // Update staking functions to check minimum amount
     function stakeMlpBoosted(
         uint256 amount,
-        uint256 stakingPeriod
+        uint256 stakingPeriod,
+        StakingType stakingType
     ) external nonReentrant {
+        require(amount >= minimumStakeAmount, "Amount below minimum stake");
         require(amount > 0, "Amount must be greater than 0");
         require(
             stakingPeriod == THIRTY_DAYS ||
@@ -352,6 +374,7 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
                 stakingPeriod == ONE_EIGHTY_DAYS,
             "Invalid staking period"
         );
+
         require(
             mlpToken.transferFrom(msg.sender, address(this), amount),
             "Transfer failed"
@@ -361,19 +384,22 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         stakes[msg.sender][MiningType.MLPBoosted][stakeId] = Stake({
             amount: amount,
             timestamp: block.timestamp,
-            lockPeriod: stakingPeriod
+            lockPeriod: stakingType == StakingType.FullLocked
+                ? stakingPeriod
+                : 0 // Only set lock period for FullLocked
         });
         emit StakeCreated(
             msg.sender,
             amount,
             block.timestamp,
             stakeId,
-            stakingPeriod,
+            stakingPeriod, // Always emit the actual staking period
             MiningType.MLPBoosted
         );
     }
 
     function stakeNFTBoosted(uint256 amount) external nonReentrant {
+        require(amount >= minimumStakeAmount, "Amount below minimum stake");
         require(amount > 0, "Amount must be greater than 0");
 
         IMatrixPoWStaking pow = IMatrixPoWStaking(powContract);
@@ -411,11 +437,10 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         return total > 0;
     }
 
-    function unstakeNFTBoosted(
-        uint256 stakeId,
-        MiningType miningType
-    ) external nonReentrant {
-        Stake storage stake = stakes[msg.sender][miningType][stakeId];
+    function unstakeNFTBoosted(uint256 stakeId) external nonReentrant {
+        Stake storage stake = stakes[msg.sender][MiningType.NFTBoosted][
+            stakeId
+        ];
         require(stake.amount > 0, "No stake found");
         require(
             block.timestamp >= stake.timestamp + stake.lockPeriod,
@@ -423,25 +448,28 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         );
 
         uint256 amount = stake.amount;
-        delete stakes[msg.sender][miningType][stakeId];
+        delete stakes[msg.sender][MiningType.NFTBoosted][stakeId];
 
         require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
         emit TokenUnstaked(msg.sender, amount, block.timestamp);
     }
 
-    function unstakeMLPBoosted(
-        uint256 stakeId,
-        MiningType miningType
-    ) external nonReentrant {
-        Stake storage stake = stakes[msg.sender][miningType][stakeId];
+    function unstakeMLPBoosted(uint256 stakeId) external nonReentrant {
+        Stake storage stake = stakes[msg.sender][MiningType.MLPBoosted][
+            stakeId
+        ];
         require(stake.amount > 0, "No stake found");
-        require(
-            block.timestamp >= stake.timestamp + stake.lockPeriod,
-            "Lock period not ended"
-        );
+
+        if (stake.lockPeriod > 0) {
+            // FullLocked type
+            require(
+                block.timestamp >= stake.timestamp + stake.lockPeriod,
+                "Lock period not ended"
+            );
+        }
 
         uint256 amount = stake.amount;
-        delete stakes[msg.sender][miningType][stakeId];
+        delete stakes[msg.sender][MiningType.MLPBoosted][stakeId];
 
         require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
         emit TokenUnstaked(msg.sender, amount, block.timestamp);
