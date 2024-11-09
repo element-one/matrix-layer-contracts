@@ -64,7 +64,8 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 timestamp,
         uint256 stakeId,
         uint256 lockPeriod,
-        MiningType miningType
+        MiningType miningType,
+        StakingType stakingType
     );
 
     // Replace the constant with a variable
@@ -394,7 +395,8 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
             block.timestamp,
             stakeId,
             stakingPeriod, // Always emit the actual staking period
-            MiningType.MLPBoosted
+            MiningType.MLPBoosted,
+            stakingType
         );
     }
 
@@ -422,7 +424,8 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
             block.timestamp,
             stakeId,
             0, // Lock period is 0
-            MiningType.NFTBoosted
+            MiningType.NFTBoosted,
+            StakingType.FreeWithdraw
         );
     }
 
