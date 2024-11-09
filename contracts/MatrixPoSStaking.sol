@@ -44,7 +44,9 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
     event TokenUnstaked(
         address indexed user,
         uint256 amount,
-        uint256 timestamp
+        uint256 timestamp,
+        uint256 stakeId,
+        MiningType miningType
     );
     event RewardClaimed(
         address indexed user,
@@ -454,7 +456,13 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         delete stakes[msg.sender][MiningType.NFTBoosted][stakeId];
 
         require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
-        emit TokenUnstaked(msg.sender, amount, block.timestamp);
+        emit TokenUnstaked(
+            msg.sender,
+            amount,
+            block.timestamp,
+            stakeId,
+            MiningType.NFTBoosted
+        );
     }
 
     function unstakeMLPBoosted(uint256 stakeId) external nonReentrant {
@@ -475,7 +483,13 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         delete stakes[msg.sender][MiningType.MLPBoosted][stakeId];
 
         require(mlpToken.transfer(msg.sender, amount), "Transfer failed");
-        emit TokenUnstaked(msg.sender, amount, block.timestamp);
+        emit TokenUnstaked(
+            msg.sender,
+            amount,
+            block.timestamp,
+            stakeId,
+            MiningType.MLPBoosted
+        );
     }
 
     // Add helper to get total staked amount for a user and mining type
