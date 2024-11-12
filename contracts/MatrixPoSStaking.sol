@@ -447,9 +447,11 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
             stakeId
         ];
         require(stake.amount > 0, "No stake found");
+
+        // Check minimum staking period
         require(
-            block.timestamp >= stake.timestamp + stake.lockPeriod,
-            "Lock period not ended"
+            block.timestamp >= stake.timestamp + MINIMUM_STAKING_PERIOD,
+            "Minimum staking period not reached"
         );
 
         uint256 amount = stake.amount;
@@ -470,6 +472,12 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
             stakeId
         ];
         require(stake.amount > 0, "No stake found");
+
+        // Check minimum staking period
+        require(
+            block.timestamp >= stake.timestamp + MINIMUM_STAKING_PERIOD,
+            "Minimum staking period not reached"
+        );
 
         if (stake.lockPeriod > 0) {
             // FullLocked type
