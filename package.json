@@ -2,12 +2,14 @@
   "scripts": {
     "deploy:powStaking": "hardhat run scripts/deployPoWStaking.ts --network bscTestnet",
     "deploy:posStaking": "hardhat run scripts/deployPoSStaking.ts --network bscTestnet",
+    "deploy:promotion": "hardhat run scripts/deployPromotionStaking.ts --network bscTestnet",
     "deploy:payment": "hardhat run scripts/deployPayment.ts --network bscTestnet",
     "deploy:nfts": "hardhat run scripts/deployNFT.ts --network bscTestnet",
     "update:nfts": "hardhat run scripts/updateNFT.ts --network bscTestnet",
     "deploy:powStaking:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployPoWStaking.ts --network bscMainnet",
     "deploy:posStaking:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployPoSStaking.ts --network bscMainnet",
     "deploy:payment:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployPayment.ts --network bscMainnet",
+    "deploy:promotion:mainnet": "hardhat run scripts/deployPromotionStaking.ts --network bscMainnet",
     "deploy:nfts:mainnet": "cross-env NODE_ENV=production hardhat run scripts/deployNFT.ts --network bscMainnet",
     "operator": "ts-node scripts/setOperator.ts",
     "operator:mainnet": "cross-env NODE_ENV=production ts-node scripts/setOperator.ts"
