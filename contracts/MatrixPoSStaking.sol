@@ -88,6 +88,7 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
 
     // Add vesting schedule constants
     uint256 public constant YEAR_DURATION = 365 days;
+    uint256 public constant YEAR_COUNT = 365;
     uint256[5] public VESTING_PERCENTAGES = [40, 30, 15, 10, 5]; // in percentage points
 
     // Add vesting variables
@@ -275,7 +276,7 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         // Calculate daily cap based on current year's percentage
         uint256 yearlyAmount = (totalMlpReward *
             getCurrentVestingPercentage()) / 100;
-        return yearlyAmount / YEAR_DURATION;
+        return yearlyAmount / YEAR_COUNT;
     }
 
     // Add helper function to get maximum claimable amount
@@ -305,7 +306,7 @@ contract MatrixPoSStaking is ReentrancyGuard, Ownable, EIP712 {
         uint256 currentYearAmount = (totalMlpReward *
             getCurrentVestingPercentage() *
             poolPercentage) / 10000;
-        uint256 dailyCap = currentYearAmount / YEAR_DURATION;
+        uint256 dailyCap = currentYearAmount / YEAR_COUNT;
         totalAllowedClaims += dailyCap * getCurrentDay();
 
         // Check claimed rewards for specific pool
